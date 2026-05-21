@@ -10070,7 +10070,8 @@ const baseChartOpts = {
 };
 
 function buildLineDataset(rutaKey) {
-  const h = APP_DATA.historico[rutaKey];
+  const h = APP_DATA.historico ? APP_DATA.historico[rutaKey] : null;
+  if (!h) return { labels: [], datasets: [] };
   return {
     labels: h.labels,
     datasets: ['MSC','ONE','CMA'].map(c => ({
@@ -10128,7 +10129,8 @@ function initCharts() {
   if (chartComparativo) chartComparativo.destroy();
   const rutas = ['Moin — 20GP','Moin — 40HQ','Caldera — 20GP','Caldera — 40HQ'];
   const buildBar = (carrier, rutaKeys) => rutaKeys.map(k => {
-    const histo = APP_DATA.historico[k];
+    const histo = APP_DATA.historico ? APP_DATA.historico[k] : null;
+    if (!histo || !histo[carrier] || !histo[carrier].length) return 0;
     return histo[carrier][histo[carrier].length - 1];
   });
   const keys = ['Moin-20GP','Moin-40HQ','Caldera-20GP','Caldera-40HQ'];
