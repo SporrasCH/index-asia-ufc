@@ -10250,6 +10250,7 @@ function downloadAiSummaryPdf() {
   printAiResumen();
 }
 function getActiveSummaryText() {
+  if (activeSummaryType === 'ratesheet') return buildClientRatesheet();
   return activeSummaryType === 'client' ? buildClientMarketUpdate() : buildExecutiveSummary();
 }
 
@@ -10311,7 +10312,7 @@ async function copyAiSnapshot(type = 'internal') {
 }
 function setSummaryTab(type) {
   persistAiSummaryDraft();
-  activeSummaryType = type === 'client' ? 'client' : type === 'ai' ? 'ai' : 'internal';
+  activeSummaryType = type === 'client' ? 'client' : type === 'ratesheet' ? 'ratesheet' : type === 'ai' ? 'ai' : 'internal';
   document.querySelectorAll('.summary-tab').forEach(btn => {
     btn.classList.toggle('summary-tab--active', btn.dataset.summaryTab === activeSummaryType);
   });
@@ -10355,7 +10356,9 @@ function copyActiveSummary() {
 function downloadActiveSummaryTxt() {
   const output = document.getElementById('summary-output');
   if (!output) return;
-  const name = activeSummaryType === 'client' ? 'market-update-clientes' : 'resumen-interno';
+  const name = activeSummaryType === 'ratesheet' ? 'tarifario-cliente'
+             : activeSummaryType === 'client'    ? 'market-update-clientes'
+             : 'resumen-interno';
   const date = (APP_DATA.config.fechaHoy || '').replace(/-/g, '');
   const blob = new Blob([output.value], { type: 'text/plain;charset=utf-8' });
   const url = URL.createObjectURL(blob);
@@ -10427,6 +10430,7 @@ document.addEventListener('DOMContentLoaded', () => {
         <div class="summary-tabs" role="tablist" aria-label="Tipo de resumen">
           <button type="button" class="summary-tab summary-tab--active" data-summary-tab="internal" onclick="setSummaryTab('internal')">Resumen interno</button>
           <button type="button" class="summary-tab" data-summary-tab="client" onclick="setSummaryTab('client')">Market update clientes</button>
+          <button type="button" class="summary-tab" data-summary-tab="ratesheet" onclick="setSummaryTab('ratesheet')">Tarifario cliente</button>
           <button type="button" class="summary-tab" data-summary-tab="ai" onclick="setSummaryTab('ai')">Resumen IA</button>
         </div>
         <input id="ai-document-title" class="summary-title-input" type="text" placeholder="Nombre del documento (ej: Resumen Asia — Mayo 2026)" hidden>
