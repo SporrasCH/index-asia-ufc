@@ -10012,8 +10012,8 @@ function renderDataHub() {
       <td>${r.pod}</td>
       <td>${r.equipo}</td>
       <td>${fmt.usd(r.compra)}</td>
-      <td>${fmt.usd(r.markup)}</td>
-      <td style="color:var(--emerald-600); font-weight:600;">${fmt.usd(r.venta)}</td>
+      <td>${fmt.usd(APP_DATA.config.markup)}</td>
+      <td style="color:var(--emerald-600); font-weight:600;">${fmt.usd(r.compra + APP_DATA.config.markup)}</td>
       <td>${fmt.date(r.vigDesde)}</td>
       <td>${fmt.date(r.vigHasta)}</td>
       <td>${r.estado}</td>
