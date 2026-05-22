@@ -4093,6 +4093,49 @@ destinoConfig: {
 };
 
 /* =========================================================================
+   HISTORICO RUNTIME — derivado de baseHistorica + tarifas
+   Genera APP_DATA.historico para charts. No editar manualmente.
+   ========================================================================= */
+(function initHistorico() {
+  const carriers = ['MSC', 'ONE', 'CMA'];
+  const routes = ['Moin-20GP', 'Moin-40HQ', 'Caldera-20GP', 'Caldera-40HQ'];
+  const hist = {};
+  routes.forEach(function(rk) {
+    const parts = rk.split(/-(?=\d)/);
+    const pod = parts[0], equipo = parts[1];
+    const baseEntries = (APP_DATA.baseHistorica || []).filter(function(r) {
+      return r.pod === pod && r.equipo === equipo && carriers.indexOf(r.carrier) >= 0;
+    }).map(function(r) { return { carrier: r.carrier, fecha: r.fecha, compra: r.compra }; });
+    const tarifaEntries = (APP_DATA.tarifas || []).filter(function(r) {
+      return r.pod === pod && r.equipo === equipo && carriers.indexOf(r.carrier) >= 0 && r.vigDesde;
+    }).map(function(r) { return { carrier: r.carrier, fecha: r.vigDesde, compra: r.compra }; });
+    const merged = baseEntries.slice();
+    tarifaEntries.forEach(function(t) {
+      const idx = merged.findIndex(function(r) { return r.carrier === t.carrier && r.fecha === t.fecha; });
+      if (idx >= 0) merged[idx] = t; else merged.push(t);
+    });
+    const allDates = merged.map(function(r) { return r.fecha; })
+      .filter(function(v, i, a) { return a.indexOf(v) === i; }).sort();
+    const obj = { labels: allDates };
+    carriers.forEach(function(c) {
+      const arr = allDates.map(function(d) {
+        const row = merged.find(function(r) { return r.carrier === c && r.fecha === d; });
+        return row ? row.compra : null;
+      });
+      // Trailing forward-fill: garantiza que buildBar() obtenga valor real en último índice
+      let lastKnown = null;
+      for (let i = 0; i < arr.length; i++) { if (arr[i] !== null) lastKnown = arr[i]; }
+      for (let i = arr.length - 1; i >= 0; i--) {
+        if (arr[i] === null && lastKnown !== null) arr[i] = lastKnown; else break;
+      }
+      obj[c] = arr;
+    });
+    hist[rk] = obj;
+  });
+  APP_DATA.historico = hist;
+})();
+
+/* =========================================================================
    BUSINESS RULES
    ========================================================================= */
 function parseLocalDate(value) {
