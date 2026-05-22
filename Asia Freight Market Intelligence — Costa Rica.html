@@ -4585,7 +4585,6 @@ function getAccionComercial(pod, equipo) {
     motivo = `${t.carrier} en ${pod}/${equipo}: condiciones estables. Vigencia hasta ${fmt.dateShort(vigHasta)}.`;
   }
 
-  // F2 — Advisory pressure modifier
   const advisoryPressure = getAdvisoryPressure(t.carrier, pod, equipo);
   if (advisoryPressure) {
     const originalRiesgoKey = riesgoKey;
@@ -5483,10 +5482,6 @@ function renderSummary() {
 }
 
 /* =========================================================================
-   RENDER: SEMÁFORO TABLE
-   ========================================================================= */
-
-/* =========================================================================
    RENDER: PANORAMA — COMPARATIVO RÁPIDO
    ========================================================================= */
 function renderPanoramaComparativo() {
@@ -5982,29 +5977,12 @@ function initCharts() {
    ========================================================================= */
 let activeSummaryType = 'internal';
 
-function getSummaryRoutes() {
-  return [['Caldera','20GP'], ['Caldera','40HQ'], ['Moin','20GP'], ['Moin','40HQ']];
-}
-
 function isValidNumber(value) {
   return typeof value === 'number' && Number.isFinite(value);
 }
 
-function safeUsd(value, fallback = 'No disponible') {
-  return isValidNumber(value) ? fmt.usd(value) : fallback;
-}
-
 function safeDate(value, fallback = 'por confirmar') {
   return value ? fmt.date(value) : fallback;
-}
-
-function safeDays(value) {
-  const days = diasRestantes(value);
-  return Number.isFinite(days) ? `${days} días` : 'días por confirmar';
-}
-
-function getRouteTariffs(pod, equipo) {
-  return APP_DATA.tarifas.filter(t => t.pod === pod && t.equipo === equipo && t.uso === 'Sí');
 }
 
 function getUpcomingCommercialTariffs() {
