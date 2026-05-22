@@ -6547,11 +6547,16 @@ function printClientRatesheet() {
     ? '$' + value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
     : '—';
   const dateRange = rows => {
-    const dates = rows.flatMap(t => [t.vigDesde, t.vigHasta]).filter(Boolean).map(parseLocalDate).filter(d => !isNaN(d));
-    if (!dates.length) return 'por confirmar';
-    const min = new Date(Math.min(...dates.map(d => d.getTime())));
-    const max = new Date(Math.max(...dates.map(d => d.getTime())));
-    return fmt.date(min) + ' al ' + fmt.date(max);
+    const meses = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+    const desdes = rows.map(t => t.vigDesde).filter(Boolean).sort();
+    const hastas = rows.map(t => t.vigHasta).filter(Boolean);
+    if (!desdes.length || !hastas.length) return 'por confirmar';
+    const diaInicio = parseInt(desdes[desdes.length - 1].split('-')[2], 10);
+    const counts = {};
+    hastas.forEach(h => { counts[h] = (counts[h] || 0) + 1; });
+    const modeHasta = Object.entries(counts).sort((a, b) => b[1] - a[1])[0][0];
+    const [anio, mes, dia] = modeHasta.split('-');
+    return 'Del ' + diaInicio + ' al ' + parseInt(dia, 10) + ' de ' + meses[parseInt(mes, 10) - 1] + ' del ' + anio;
   };
   const findTarifa = (pod, carrier, equipo) => tarifas.find(t => t.pod === pod && t.carrier === carrier && t.equipo === equipo);
   const validez = dateRange(tarifas);
@@ -6578,7 +6583,8 @@ function printClientRatesheet() {
 <title>Tarifario FCL – United Freight Cargo - Validez ${esc(validez)}</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Barlow:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400&display=swap" rel="stylesheet">
+<style>@import url('https://fonts.googleapis.com/css2?family=Barlow:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400&display=swap');</style>
 <style>
 *, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
 html { font-family:'Barlow',sans-serif; background:#b0c4d8; }
@@ -6765,7 +6771,9 @@ body {
         <table><tbody>
           <tr><td>Puertos de Origen (POL)</td><td>Shanghai, Qingdao, Xiamen, Tianjin, Shekou, Yantian, Busan, Tokyo, Port Klang, Bangkok, Da Nang...</td></tr>
           <tr><td>Puertos de destino (POD)</td><td>Moin / Caldera, Costa Rica</td></tr>
-          <tr><td>Modalidad</td><td>FCL - FOB / Carga general</td></tr>
+          <tr><td>Destino final</td><td>?rea Metropolitana de Costa Rica (GAM)</td></tr>
+          <tr><td>Carrier</td><td>Opciones compartidas en tarifario</td></tr>
+          <tr><td>Tiempo de tr?nsito estimado</td><td>35 ? 60 d?as (puerto a puerto) aprox.</td></tr>
           <tr><td>Validez</td><td>${esc(validez)}</td></tr>
         </tbody></table>
       </div>
