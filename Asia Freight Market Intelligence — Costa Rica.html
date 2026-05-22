@@ -2981,7 +2981,7 @@ body.app-booting #datahub-table {
             </div>
             <div class="card__body">
               <div style="height:220px;"><canvas id="chart-movement" width="541" height="220" style="display: block; box-sizing: border-box; height: 220px; width: 541px;"></canvas></div>
-              <div class="see-all">
+              <div class="see-all" onclick="document.querySelector('[data-section=historicos]').click()" style="cursor:pointer">
                 <span>Ver análisis completo</span>
                 <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="chevron-right" aria-hidden="true" class="lucide lucide-chevron-right"><path d="m9 18 6-6-6-6"></path></svg>
               </div>
@@ -5262,6 +5262,14 @@ function updateRecomendador() {
       <div><strong>${aplicada.carrier}</strong> es la mejor opción para la fecha seleccionada con compra ${fmt.usd(aplicada.compra)} y venta ${fmt.usd(venta)}.</div>
     </div>`;
 
+  if (prioridad === 'Carrier preferido' && !carrier) {
+    comentarios += `
+      <div class="alert alert--amber">
+        <i data-lucide="alert-triangle"></i>
+        <div><strong>Seleccioná un carrier</strong> para usar la prioridad Carrier preferido.</div>
+      </div>`;
+  }
+
   if (aplicada.usaProxima) {
     comentarios += `
       <div class="alert alert--blue">
@@ -5728,8 +5736,34 @@ function renderPanoramaInsights() {
 }
 
 
+function getPreviousHistoricalValue(carrier, pod, equipo, compraActual, currentVigDesde) {
+  const currentDate = currentVigDesde ? parseLocalDate(currentVigDesde) : null;
+  const realRows = (APP_DATA.baseHistorica || [])
+    .filter(h => h.carrier === carrier && h.pod === pod && h.equipo === equipo && h.uso === 'S\u00ed' && typeof h.compra === 'number')
+    .filter(h => {
+      if (!currentDate) return true;
+      const rowDate = parseLocalDate(h.vigDesde || h.fecha);
+      return rowDate < currentDate;
+    })
+    .sort((a, b) => parseLocalDate(a.vigDesde || a.fecha) - parseLocalDate(b.vigDesde || b.fecha));
+
+  if (realRows.length) return realRows[realRows.length - 1].compra;
+
+  const key = pod + '-' + equipo;
+  const histo = APP_DATA.historico ? APP_DATA.historico[key] : null;
+  const serie = histo && histo[carrier]
+    ? histo[carrier].filter(v => v !== null && v !== undefined && typeof v === 'number')
+    : [];
+
+  for (let i = serie.length - 1; i >= 0; i--) {
+    if (serie[i] !== compraActual) return serie[i];
+  }
+
+  return null;
+}
+
 function renderSemaforo() {
-  // Para el semáforo simulamos compra "anterior" usando el segundo dato más reciente del histórico
+  // Compra anterior real desde baseHistorica; fallback defensivo a historico sin forward-fill duplicado
   let html = `<thead><tr>
     <th>Carrier</th><th>Ruta</th><th>Compra anterior</th>
     <th>Compra actual</th><th>Venta al Cliente</th>
@@ -5745,15 +5779,10 @@ function renderSemaforo() {
     if (!op || typeof op.compra !== 'number') return;
 
     const compraActual = op.compra;
-    const key = `${t.pod}-${t.equipo}`;
-    const histo = APP_DATA.historico ? APP_DATA.historico[key] : null;
-    const serieCarrier = histo && histo[t.carrier]
-      ? histo[t.carrier].filter(v => v !== null && v !== undefined)
-      : [];
-
-    const compraAnt = serieCarrier.length >= 4 ? serieCarrier[serieCarrier.length - 4] : compraActual;
-    const variacion = compraActual - compraAnt;
-    const varPct = compraAnt !== 0 ? (variacion / compraAnt * 100) : 0;
+    const compraAnt = getPreviousHistoricalValue(t.carrier, t.pod, t.equipo, compraActual, op.vigDesde);
+    const hasAnterior = typeof compraAnt === 'number' && Number.isFinite(compraAnt);
+    const variacion = hasAnterior ? compraActual - compraAnt : 0;
+    const varPct = hasAnterior && compraAnt !== 0 ? (variacion / compraAnt * 100) : 0;
     const venta = calcVenta(compraActual);
 
     let semClass, varClass;
@@ -5764,11 +5793,11 @@ function renderSemaforo() {
     html += `<tr>
       <td><strong>${t.carrier}</strong></td>
       <td>${t.pod} — ${t.equipo}</td>
-      <td style="text-align:right">${fmt.usd(compraAnt)}</td>
+      <td style="text-align:right">${hasAnterior ? fmt.usd(compraAnt) : 'Sin datos'}</td>
       <td style="text-align:right">${fmt.usd(compraActual)}</td>
       <td style="text-align:right; color:var(--emerald-600); font-weight:700;">${fmt.usd(venta)}</td>
-      <td class="${varClass}" style="text-align:right">${variacion>=0?'+':''}${fmt.usd(Math.abs(variacion))}</td>
-      <td class="${varClass}" style="text-align:right">${varPct>=0?'+':''}${varPct.toFixed(1)}%</td>
+      <td class="${varClass}" style="text-align:right">${hasAnterior ? (variacion>=0?'+':'') + fmt.usd(Math.abs(variacion)) : 'Sin datos'}</td>
+      <td class="${varClass}" style="text-align:right">${hasAnterior ? (varPct>=0?'+':'') + varPct.toFixed(1) + '%' : 'Sin datos'}</td>
       <td><span class="sem-light ${semClass}"></span></td>
     </tr>`;
   });
