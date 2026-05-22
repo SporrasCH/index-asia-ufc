@@ -4122,11 +4122,13 @@ destinoConfig: {
         const row = merged.find(function(r) { return r.carrier === c && r.fecha === d; });
         return row ? row.compra : null;
       });
-      // Trailing forward-fill: garantiza que buildBar() obtenga valor real en último índice
+      // Forward-fill completo: propaga último valor conocido hacia adelante.
+      // Elimina nulls internos que causan gaps en Chart.js.
+      // Nulls iniciales (antes del primer dato) se mantienen.
       let lastKnown = null;
-      for (let i = 0; i < arr.length; i++) { if (arr[i] !== null) lastKnown = arr[i]; }
-      for (let i = arr.length - 1; i >= 0; i--) {
-        if (arr[i] === null && lastKnown !== null) arr[i] = lastKnown; else break;
+      for (let i = 0; i < arr.length; i++) {
+        if (arr[i] !== null) { lastKnown = arr[i]; }
+        else if (lastKnown !== null) { arr[i] = lastKnown; }
       }
       obj[c] = arr;
     });
@@ -5828,6 +5830,7 @@ const chartColors = {
 const baseChartOpts = {
   responsive: true,
   maintainAspectRatio: false,
+  spanGaps: true,
   plugins: {
     legend: {
       position: 'top',
@@ -5880,6 +5883,7 @@ function miniLineOpts() {
   return {
     responsive: true,
     maintainAspectRatio: false,
+    spanGaps: true,
     plugins: {
       legend: { display: false },
       tooltip: {
