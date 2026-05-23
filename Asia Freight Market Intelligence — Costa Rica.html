@@ -6120,13 +6120,26 @@ function exportDataHubCsv() {
     'Markup USD','Venta USD','Vig. Desde','Vig. Hasta',
     'Estado','Es Última','Es Próxima','Tipo','Uso Comercial','Fuente','Clasificación'];
 
+  const escCsv = v => '"' + String(v ?? '').replace(/"/g, '""') + '"';
   const rows = registros.map(r => [
-    r.id, r.fecha, r.carrier, r.pod, r.equipo,
-    r.compra, APP_DATA.config.markup, r.compra + APP_DATA.config.markup,
-    r.vigDesde || '', r.vigHasta || '',
-    r.estado || '', r.esUltima || '', r.esProxima || '',
-    r.tipo || '', r.uso || '', r.fuente || '', r.clasificacion || ''
-  ].map(v => `"${v}"`).join(','));
+    r.id,
+    r.fecha,
+    r.carrier,
+    r.pod,
+    r.equipo,
+    r.compra,
+    APP_DATA.config.markup,
+    r.compra + APP_DATA.config.markup,
+    r.vigDesde || '',
+    r.vigHasta || '',
+    r.estado || '',
+    r.esUltima || '',
+    r.esProxima || '',
+    r.tipo || '',
+    r.uso || '',
+    r.fuente || '',
+    r.clasificacion || ''
+  ].map(escCsv).join(','));
 
   const csv = [headers.join(','), ...rows].join('\n');
   const date = new Date().toISOString().slice(0,10).replace(/-/g,'');
