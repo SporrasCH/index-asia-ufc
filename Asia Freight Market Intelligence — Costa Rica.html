@@ -16,6 +16,9 @@
 <!-- Charts -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
 
+<!-- Excel parser: SheetJS -->
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+
 <style>
 /* =========================================================================
    1. DESIGN TOKENS — variables base
@@ -2803,6 +2806,7 @@ button[disabled] { opacity: 0.45; cursor: not-allowed; }
   border: 1px solid var(--gray-200);
 }
 
+
 /* Anti-flash: ocultar contenido pre-renderizado hasta que JS lo reemplace */
 body.app-booting #snapshot-table,
 body.app-booting #tarifario-table,
@@ -2853,6 +2857,9 @@ body.app-booting #datahub-table {
     <div class="sidebar__footer">
       <button class="btn-export" onclick="openExecutiveSummary()">
         <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="download" aria-hidden="true" class="lucide lucide-download"><path d="M12 15V3"></path><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><path d="m7 10 5 5 5-5"></path></svg> Exportar resumen
+      </button>
+      <button class="btn-export" onclick="openAdminExcel()" style="margin-top:8px">
+        <i data-lucide="file-spreadsheet"></i> Admin Excel
       </button>
     </div>
   </aside>
@@ -7156,6 +7163,280 @@ function downloadActiveSummaryTxt() {
 /* =========================================================================
    INIT
    ========================================================================= */
+
+
+
+/* -- ADMIN EXCEL -- */
+const AE_CARRIER_MAP = [
+  { carrier: 'COSCO', col20: 2,  col40: 3,  valCol: 2,  usoCom: 'No', clasif: 'Referencia' },
+  { carrier: 'CMA',   col20: 8,  col40: 10, valCol: 8,  usoCom: 'Sí', clasif: 'Principal'  },
+  { carrier: 'PIL',   col20: 14, col40: 16, valCol: null, usoCom: 'No', clasif: 'Referencia' },
+  { carrier: 'MSC',   col20: 35, col40: 37, valCol: 32, usoCom: 'Sí', clasif: 'Principal'  },
+  { carrier: 'ONE',   col20: 44, col40: 46, valCol: 41, usoCom: 'Sí', clasif: 'Principal'  },
+];
+
+let aeExtractedRows = [];
+
+function openAdminExcel() {
+  const modal = document.getElementById('admin-excel-modal');
+  if (!modal) return;
+  modal.hidden = false;
+  aeExtractedRows = [];
+  document.getElementById('ae-status').textContent = '';
+  document.getElementById('ae-preview-section').hidden = true;
+  document.getElementById('ae-moin-section').hidden = true;
+  document.getElementById('ae-actions').hidden = true;
+  document.getElementById('ae-preview-body').innerHTML = '';
+  document.getElementById('ae-file-input').value = '';
+  buildMoinInputs();
+  if (window.lucide) lucide.createIcons();
+}
+
+function closeAdminExcel() {
+  const modal = document.getElementById('admin-excel-modal');
+  if (modal) modal.hidden = true;
+}
+
+function buildMoinInputs() {
+  const carriers = ['CMA', 'MSC', 'ONE'];
+  const container = document.getElementById('ae-moin-inputs');
+  if (!container) return;
+  let html = '<div style="font-weight:700;padding:4px 0">Carrier / Equipo</div><div style="font-weight:700;padding:4px 0">20GP (USD)</div><div style="font-weight:700;padding:4px 0">40HQ (USD)</div>';
+  carriers.forEach(c => {
+    html += `<div style="align-self:center;font-weight:600">${c}</div>`;
+    html += `<input type="number" id="ae-moin-${c}-20GP" placeholder="Compra 20GP" style="border:1px solid var(--gray-200);border-radius:6px;padding:6px 8px;font-size:12px">`;
+    html += `<input type="number" id="ae-moin-${c}-40HQ" placeholder="Compra 40HQ" style="border:1px solid var(--gray-200);border-radius:6px;padding:6px 8px;font-size:12px">`;
+  });
+  container.innerHTML = html;
+}
+
+function parseWccaValidity(raw) {
+  if (!raw) return { desde: null, hasta: null };
+  const MONTHS = { Jan:1, Feb:2, Mar:3, Apr:4, May:5, Jun:6, Jul:7, Aug:8, Sep:9, Oct:10, Nov:11, Dec:12 };
+  const m = String(raw).match(/(\d+)-(\w+)\s+to\s+(\d+)-(\w+)/i);
+  if (!m) return { desde: null, hasta: null };
+  const year = new Date().getFullYear();
+  const pad = n => String(n).padStart(2, '0');
+  const d1 = `${year}-${pad(MONTHS[m[2]] || 1)}-${pad(m[1])}`;
+  const d2 = `${year}-${pad(MONTHS[m[4]] || 1)}-${pad(m[3])}`;
+  return { desde: d1, hasta: d2 };
+}
+
+function getNextTarId() {
+  const base = APP_DATA.baseHistorica || [];
+  if (!base.length) return 'TAR-0001';
+  const ids = base.map(r => {
+    const m = String(r.id || '').match(/TAR-(\d+)/);
+    return m ? parseInt(m[1], 10) : 0;
+  });
+  const next = Math.max(...ids) + 1;
+  return 'TAR-' + String(next).padStart(4, '0');
+}
+
+function initHistorico() {
+  const carriers = ['MSC', 'ONE', 'CMA'];
+  const routes = ['Moin-20GP', 'Moin-40HQ', 'Caldera-20GP', 'Caldera-40HQ'];
+  const hist = {};
+  routes.forEach(function(rk) {
+    const parts = rk.split(/-(?=\d)/);
+    const pod = parts[0], equipo = parts[1];
+    const baseEntries = (APP_DATA.baseHistorica || []).filter(function(r) {
+      return r.pod === pod && r.equipo === equipo && carriers.indexOf(r.carrier) >= 0;
+    }).map(function(r) { return { carrier: r.carrier, fecha: r.fecha, compra: r.compra }; });
+    const tarifaEntries = (APP_DATA.tarifas || []).filter(function(r) {
+      return r.pod === pod && r.equipo === equipo && carriers.indexOf(r.carrier) >= 0 && r.vigDesde;
+    }).map(function(r) { return { carrier: r.carrier, fecha: r.vigDesde, compra: r.compra }; });
+    const merged = baseEntries.slice();
+    tarifaEntries.forEach(function(t) {
+      const idx = merged.findIndex(function(r) { return r.carrier === t.carrier && r.fecha === t.fecha; });
+      if (idx >= 0) merged[idx] = t; else merged.push(t);
+    });
+    const allDates = merged.map(function(r) { return r.fecha; })
+      .filter(function(v, i, a) { return v && a.indexOf(v) === i; }).sort();
+    const obj = { labels: allDates };
+    carriers.forEach(function(c) {
+      const arr = allDates.map(function(d) {
+        const row = merged.find(function(r) { return r.carrier === c && r.fecha === d; });
+        return row ? row.compra : null;
+      });
+      let lastKnown = null;
+      for (let i = 0; i < arr.length; i++) {
+        if (arr[i] !== null) { lastKnown = arr[i]; }
+        else if (lastKnown !== null) { arr[i] = lastKnown; }
+      }
+      obj[c] = arr;
+    });
+    hist[rk] = obj;
+  });
+  APP_DATA.historico = hist;
+}
+
+function handleAdminExcelFile(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const status = document.getElementById('ae-status');
+  status.textContent = 'Leyendo archivo...';
+
+  if (typeof XLSX === 'undefined') {
+    status.textContent = '⚠ SheetJS no disponible. Verificar conexión.';
+    return;
+  }
+
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      const data = new Uint8Array(e.target.result);
+      const wb = XLSX.read(data, { type: 'array' });
+
+      if (!wb.SheetNames.includes('WCCA')) {
+        status.textContent = '⚠ No se encontró la hoja WCCA en este archivo.';
+        return;
+      }
+
+      const ws = wb.Sheets['WCCA'];
+      const raw = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+      if (raw.length < 8) {
+        status.textContent = '⚠ Archivo WCCA con estructura inesperada.';
+        return;
+      }
+
+      const dataRow = raw[6];
+      const validRow = raw[4];
+
+      aeExtractedRows = [];
+      let idCounter = parseInt((getNextTarId().match(/\d+/) || ['0'])[0], 10);
+      const today = new Date().toISOString().split('T')[0];
+
+      AE_CARRIER_MAP.forEach(cfg => {
+        const v20 = parseFloat(dataRow[cfg.col20]);
+        const v40 = parseFloat(dataRow[cfg.col40]);
+        const rawVal = cfg.valCol !== null ? validRow[cfg.valCol] : null;
+        const { desde, hasta } = parseWccaValidity(rawVal);
+
+        ['20GP', '40HQ'].forEach(equipo => {
+          const compra = equipo === '20GP' ? v20 : v40;
+          if (!compra || isNaN(compra)) return;
+          aeExtractedRows.push({
+            id: 'TAR-' + String(idCounter++).padStart(4, '0'),
+            fecha: today,
+            carrier: cfg.carrier,
+            pod: 'Caldera',
+            equipo,
+            compra,
+            vigDesde: desde,
+            vigHasta: hasta,
+            estado: 'Próxima',
+            esUltima: 'No',
+            esProxima: 'Sí',
+            tipo: 'FAK',
+            uso: cfg.usoCom,
+            fuente: 'Parisi WCCA',
+            clasificacion: cfg.clasif,
+          });
+        });
+      });
+
+      const tbody = document.getElementById('ae-preview-body');
+      tbody.innerHTML = aeExtractedRows.map((r, i) => `
+        <tr style="background:${i % 2 === 0 ? 'white' : 'var(--gray-50)'}">
+          <td style="padding:5px 8px;font-weight:${r.uso === 'Sí' ? '600' : '400'}">${r.carrier}</td>
+          <td style="padding:5px 8px">${r.pod}</td>
+          <td style="padding:5px 8px">${r.equipo}</td>
+          <td style="padding:5px 8px;text-align:right">$${r.compra.toLocaleString()}</td>
+          <td style="padding:5px 8px">${r.vigDesde || '—'}</td>
+          <td style="padding:5px 8px">${r.vigHasta || '—'}</td>
+          <td style="padding:5px 8px">${r.tipo}</td>
+          <td style="padding:5px 8px">${r.uso}</td>
+        </tr>`).join('');
+
+      document.getElementById('ae-preview-section').hidden = false;
+      document.getElementById('ae-moin-section').hidden = false;
+      document.getElementById('ae-actions').hidden = false;
+      status.textContent = `✓ ${aeExtractedRows.length} tarifas Caldera extraídas. Completá Moin y confirmá.`;
+
+    } catch(err) {
+      status.textContent = '⚠ Error al leer el archivo: ' + err.message;
+      console.error(err);
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function confirmAdminExcel() {
+  const carriers = ['CMA', 'MSC', 'ONE'];
+  const desde = document.getElementById('ae-moin-desde').value;
+  const hasta = document.getElementById('ae-moin-hasta').value;
+  let idStr = parseInt((getNextTarId().match(/\d+/) || ['0'])[0], 10);
+  if (aeExtractedRows.length) {
+    const lastId = aeExtractedRows[aeExtractedRows.length - 1].id;
+    idStr = parseInt(lastId.match(/\d+/)[0], 10) + 1;
+  }
+
+  const moinRows = [];
+  carriers.forEach(c => {
+    ['20GP', '40HQ'].forEach(eq => {
+      const input = document.getElementById(`ae-moin-${c}-${eq}`);
+      const val = parseFloat(input ? input.value : '');
+      if (!val || isNaN(val)) return;
+      moinRows.push({
+        id: 'TAR-' + String(idStr++).padStart(4, '0'),
+        fecha: new Date().toISOString().split('T')[0],
+        carrier: c,
+        pod: 'Moin',
+        equipo: eq,
+        compra: val,
+        vigDesde: desde || null,
+        vigHasta: hasta || null,
+        estado: 'Próxima',
+        esUltima: 'No',
+        esProxima: 'Sí',
+        tipo: 'FAK',
+        uso: 'Sí',
+        fuente: 'Manual',
+        clasificacion: 'Principal',
+      });
+    });
+  });
+
+  const allRows = [...aeExtractedRows, ...moinRows];
+  if (!allRows.length) {
+    alert('No hay tarifas para importar.');
+    return;
+  }
+
+  if (!APP_DATA.baseHistorica) APP_DATA.baseHistorica = [];
+  allRows.forEach(r => {
+    APP_DATA.baseHistorica.push({
+      id: r.id,
+      fecha: r.fecha,
+      carrier: r.carrier,
+      pod: r.pod,
+      equipo: r.equipo,
+      compra: r.compra,
+      markup: APP_DATA.config.markup,
+      venta: r.compra + APP_DATA.config.markup,
+      vigDesde: r.vigDesde,
+      vigHasta: r.vigHasta,
+      estado: r.estado,
+      esUltima: r.esUltima,
+      esProxima: r.esProxima,
+      tipo: r.tipo,
+      uso: r.uso,
+      fuente: r.fuente,
+      clasificacion: r.clasificacion,
+    });
+  });
+
+  if (typeof initHistorico === 'function') initHistorico();
+  if (typeof renderDataHub === 'function') renderDataHub();
+  if (typeof renderSemaforo === 'function') renderSemaforo();
+  if (typeof initCharts === 'function') initCharts();
+
+  closeAdminExcel();
+  alert(`✓ ${allRows.length} tarifas importadas correctamente.`);
+}
+/* -- FIN ADMIN EXCEL -- */
+
 document.addEventListener('DOMContentLoaded', () => {
   // Renders
   renderDashKPIs();
@@ -7195,6 +7476,73 @@ document.addEventListener('DOMContentLoaded', () => {
 </script>
 
 
+
+  <div id="admin-excel-modal" hidden role="dialog" aria-modal="true" aria-labelledby="admin-excel-title">
+    <div class="summary-modal">
+      <div class="summary-modal__overlay" onclick="closeAdminExcel()"></div>
+      <div class="summary-modal__panel">
+        <div class="summary-modal__header">
+          <div class="summary-modal__title">
+            <h2 id="admin-excel-title">Admin Excel — Importar tarifas WCCA</h2>
+            <p>Caldera automático desde WCCA · Moin manual</p>
+          </div>
+          <button type="button" class="summary-modal__close" onclick="closeAdminExcel()">
+            <i data-lucide="x"></i>
+          </button>
+        </div>
+        <div class="summary-modal__body" style="overflow-y:auto;max-height:calc(100vh - 160px)">
+          <div id="ae-upload-zone" style="border:2px dashed var(--gray-300);border-radius:10px;padding:24px;text-align:center;cursor:pointer" onclick="document.getElementById('ae-file-input').click()">
+            <i data-lucide="upload" style="margin-bottom:8px"></i>
+            <p style="margin:0;font-size:14px;color:var(--gray-600)">Clic para seleccionar el archivo Excel de Parisi (WCCA .xls)</p>
+            <input type="file" id="ae-file-input" accept=".xls,.xlsx" hidden onchange="handleAdminExcelFile(event)">
+          </div>
+          <div id="ae-status" style="font-size:13px;color:var(--gray-600);min-height:20px"></div>
+          <div id="ae-preview-section" hidden>
+            <p style="font-size:13px;font-weight:700;margin:0 0 8px">Tarifas extraídas — Caldera (China Basic Port)</p>
+            <div style="overflow-x:auto">
+              <table id="ae-preview-table" style="width:100%;border-collapse:collapse;font-size:12px">
+                <thead>
+                  <tr style="background:var(--gray-100)">
+                    <th style="padding:6px 8px;text-align:left">Carrier</th>
+                    <th style="padding:6px 8px;text-align:left">POD</th>
+                    <th style="padding:6px 8px;text-align:left">Equipo</th>
+                    <th style="padding:6px 8px;text-align:right">Compra USD</th>
+                    <th style="padding:6px 8px;text-align:left">Vigencia Desde</th>
+                    <th style="padding:6px 8px;text-align:left">Vigencia Hasta</th>
+                    <th style="padding:6px 8px;text-align:left">Tipo</th>
+                    <th style="padding:6px 8px;text-align:left">Uso Com.</th>
+                  </tr>
+                </thead>
+                <tbody id="ae-preview-body"></tbody>
+              </table>
+            </div>
+          </div>
+          <div id="ae-moin-section" hidden>
+            <p style="font-size:13px;font-weight:700;margin:8px 0">Tarifas Moin — ingreso manual</p>
+            <div id="ae-moin-inputs" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;font-size:12px"></div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px;font-size:12px">
+              <div>
+                <label style="display:block;margin-bottom:4px;font-weight:600">Vigencia Desde</label>
+                <input type="date" id="ae-moin-desde" style="width:100%;border:1px solid var(--gray-200);border-radius:6px;padding:6px 8px;font-size:12px">
+              </div>
+              <div>
+                <label style="display:block;margin-bottom:4px;font-weight:600">Vigencia Hasta</label>
+                <input type="date" id="ae-moin-hasta" style="width:100%;border:1px solid var(--gray-200);border-radius:6px;padding:6px 8px;font-size:12px">
+              </div>
+            </div>
+          </div>
+          <div class="summary-modal__actions" id="ae-actions" hidden>
+            <button type="button" class="summary-action" onclick="closeAdminExcel()">
+              <i data-lucide="x"></i> Cancelar
+            </button>
+            <button type="button" class="summary-action summary-action--primary" onclick="confirmAdminExcel()">
+              <i data-lucide="check"></i> Confirmar e importar
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
 
   <div id="summary-modal" class="summary-modal" hidden aria-hidden="true">
     <div class="summary-modal__overlay" onclick="closeExecutiveSummary()"></div>
