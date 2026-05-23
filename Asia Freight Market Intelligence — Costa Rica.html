@@ -3928,8 +3928,8 @@ body.app-booting #datahub-table {
               <button class="filter-select" style="cursor:pointer;background:var(--gray-100);border:1px solid var(--gray-200);border-radius:8px;padding:8px 14px;font-size:13px" onclick="resetDataHubFilters()">
                 Limpiar
               </button>
-              <button class="filter-select" style="cursor:pointer;background:var(--navy-900);color:white;border:none;border-radius:8px;padding:8px 14px;font-size:13px;font-weight:600" onclick="exportDataHubCsv()">
-                ↓ Exportar CSV
+              <button class="filter-select" style="cursor:pointer;background:var(--navy-900);color:white;border:none;border-radius:8px;padding:8px 14px;font-size:13px;font-weight:600" onclick="buildDataHubResumen()">
+                📊 Resumen del período
               </button>
             </div>
           </div>
@@ -6097,7 +6097,7 @@ function resetDataHubFilters() {
   renderDataHubRows(APP_DATA.baseHistorica || []);
 }
 
-function exportDataHubCsv() {
+function buildDataHubResumen() {
   const carrier = document.getElementById('dh-filter-carrier')?.value || '';
   const pod     = document.getElementById('dh-filter-pod')?.value || '';
   const equipo  = document.getElementById('dh-filter-equipo')?.value || '';
@@ -6116,43 +6116,84 @@ function exportDataHubCsv() {
     return true;
   });
 
-  const SEP = ';';
-  const q = v => '"' + String(v === null || v === undefined ? '' : v).replace(/"/g, '""') + '"';
+  if (!registros.length) {
+    alert('No hay registros para el período seleccionado.');
+    return;
+  }
 
-  const headers = ['ID','Fecha','Carrier','POD','Equipo','Compra USD',
-    'Markup USD','Venta USD','Vig. Desde','Vig. Hasta',
-    'Estado','Es Ultima','Es Proxima','Tipo','Uso Comercial','Fuente','Clasificacion'];
+  const markup = APP_DATA.config.markup;
+  const carriers = ['MSC', 'ONE', 'CMA'];
+  const pods = pod ? [pod] : ['Caldera', 'Moin'];
+  const equipos = equipo ? [equipo] : ['20GP', '40HQ'];
 
-  const rows = registros.map(r => [
-    q(r.id),
-    q(r.fecha),
-    q(r.carrier),
-    q(r.pod),
-    q(r.equipo),
-    q(r.compra),
-    q(APP_DATA.config.markup),
-    q(r.compra + APP_DATA.config.markup),
-    q(r.vigDesde),
-    q(r.vigHasta),
-    q(r.estado),
-    q(r.esUltima),
-    q(r.esProxima),
-    q(r.tipo),
-    q(r.uso),
-    q(r.fuente),
-    q(r.clasificacion)
-  ].join(SEP));
+  const periodoLabel = desde || hasta
+    ? `${desde || '—'} → ${hasta || '—'}`
+    : 'Todos los períodos';
 
-  const bom = '\uFEFF';
-  const csv = bom + [headers.map(q).join(SEP), ...rows].join('\r\n');
-  const date = new Date().toISOString().slice(0,10).replace(/-/g,'');
-  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
-  const url  = URL.createObjectURL(blob);
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = 'DataHub-Asia-UFC-' + date + '.csv';
-  link.click();
-  URL.revokeObjectURL(url);
+  const filtrosLabel = [
+    carrier ? `Carrier: ${carrier}` : '',
+    pod     ? `POD: ${pod}`         : '',
+    equipo  ? `Equipo: ${equipo}`   : '',
+    estado  ? `Estado: ${estado}`   : '',
+  ].filter(Boolean).join(' · ') || 'Sin filtros adicionales';
+
+  let lines = [];
+  lines.push('RESUMEN DE TARIFAS — ASIA FREIGHT');
+  lines.push('═'.repeat(48));
+  lines.push(`Período  : ${periodoLabel}`);
+  lines.push(`Filtros  : ${filtrosLabel}`);
+  lines.push(`Registros: ${registros.length}`);
+  lines.push('');
+
+  pods.forEach(p => {
+    equipos.forEach(eq => {
+      const rutaRegs = registros.filter(r => r.pod === p && r.equipo === eq);
+      if (!rutaRegs.length) return;
+
+      lines.push(`─── ${p} · ${eq} ${'─'.repeat(30 - p.length - eq.length)}`);
+
+      let mejor = null;
+      carriers.forEach(c => {
+        const regs = rutaRegs.filter(r => r.carrier === c);
+        if (!regs.length) return;
+
+        // Tarifa más reciente del carrier en este filtro
+        const sorted = regs.slice().sort((a, b) => (b.vigDesde || '').localeCompare(a.vigDesde || ''));
+        const last = sorted[0];
+        const compra = last.compra;
+        const venta  = compra + markup;
+
+        if (!mejor || compra < mejor.compra) mejor = { carrier: c, compra };
+
+        const vigStr = last.vigDesde
+          ? `${last.vigDesde} → ${last.vigHasta || '?'}`
+          : 'sin vigencia';
+
+        lines.push(`  ${c.padEnd(6)} Compra $${String(compra).padStart(5)}  Venta $${String(venta).padStart(5)}   ${vigStr}`);
+      });
+
+      if (mejor) {
+        lines.push(`  → Mejor precio: ${mejor.carrier} ($${mejor.compra})`);
+      }
+      lines.push('');
+    });
+  });
+
+  lines.push('═'.repeat(48));
+  lines.push(`Generado: ${new Date().toLocaleString('es-CR')}`);
+  lines.push(`Markup aplicado: $${markup} USD fijo`);
+
+  const texto = lines.join('\n');
+
+  // Abrir en el modal de exports existente
+  const modal = document.getElementById('summary-modal');
+  const output = document.getElementById('summary-output');
+  if (modal && output) {
+    output.value = texto;
+    modal.hidden = false;
+    modal.setAttribute('aria-hidden', 'false');
+    if (window.lucide) lucide.createIcons();
+  }
 }
 function renderDataHub() {
   const registros = APP_DATA.baseHistorica || [];
