@@ -3877,6 +3877,49 @@ body.app-booting #datahub-table {
           <span class="datahub-note__item"><span class="status-pill status-pill--proxima">Proxima</span> tarifa futura cargada</span>
           <span class="datahub-note__item"><span class="status-pill status-pill--sin-datos">Sin datos</span> pendiente de validar</span>
         </div>
+        <div class="tarifario-filters" id="datahub-filters" style="margin-bottom:16px">
+          <div class="filter-field">
+            <label class="filter-label">Carrier</label>
+            <select id="dh-filter-carrier" class="filter-select" onchange="applyDataHubFilters()">
+              <option value="">Todos</option>
+              <option>MSC</option>
+              <option>ONE</option>
+              <option>CMA</option>
+              <option>COSCO</option>
+              <option>PIL</option>
+            </select>
+          </div>
+          <div class="filter-field">
+            <label class="filter-label">POD</label>
+            <select id="dh-filter-pod" class="filter-select" onchange="applyDataHubFilters()">
+              <option value="">Todos</option>
+              <option>Caldera</option>
+              <option>Moin</option>
+            </select>
+          </div>
+          <div class="filter-field">
+            <label class="filter-label">Equipo</label>
+            <select id="dh-filter-equipo" class="filter-select" onchange="applyDataHubFilters()">
+              <option value="">Todos</option>
+              <option>20GP</option>
+              <option>40HQ</option>
+            </select>
+          </div>
+          <div class="filter-field">
+            <label class="filter-label">Estado</label>
+            <select id="dh-filter-estado" class="filter-select" onchange="applyDataHubFilters()">
+              <option value="">Todos</option>
+              <option>Vigente</option>
+              <option>Próxima</option>
+              <option>Vencida</option>
+            </select>
+          </div>
+          <div class="filter-field" style="align-self:flex-end">
+            <button class="filter-select" style="cursor:pointer;background:var(--gray-100);border:1px solid var(--gray-200);border-radius:8px;padding:8px 16px;font-size:13px" onclick="resetDataHubFilters()">
+              Limpiar filtros
+            </button>
+          </div>
+        </div>
         <div class="tarifario-table-wrap" style="overflow-x:auto;">
           <table class="data-hub-table" id="datahub-table"><thead><tr>
     <th>ID</th><th>Fecha ingreso</th><th>Carrier</th><th>POD</th><th>Equipo</th>
@@ -5970,18 +6013,10 @@ function renderSemaforo() {
 /* =========================================================================
    RENDER: DATA HUB
    ========================================================================= */
-function renderDataHub() {
-  const registros = APP_DATA.baseHistorica || [];
-  let html = `<thead><tr>
-    <th>ID</th><th>Fecha ingreso</th><th>Carrier</th><th>POD</th><th>Equipo</th>
-    <th>Compra USD</th><th>Markup USD</th><th>Venta USD</th>
-    <th>Vig. desde</th><th>Vig. hasta</th>
-    <th>Estado</th><th>Es ultima</th><th>Es proxima</th>
-    <th>Tipo</th><th>Uso comercial</th><th>Fuente</th><th>Clasificacion</th>
-  </tr></thead><tbody>`;
-
-  registros.forEach(r => {
-    html += `<tr>
+function renderDataHubRows(registros) {
+  const tbody = document.querySelector('#datahub-table tbody');
+  if (!tbody) return;
+  tbody.innerHTML = registros.map((r, i) => `<tr>
       <td class="id-cell">${r.id}</td>
       <td>${fmt.date(r.fecha)}</td>
       <td><strong>${r.carrier}</strong></td>
@@ -5989,21 +6024,55 @@ function renderDataHub() {
       <td>${r.equipo}</td>
       <td>${fmt.usd(r.compra)}</td>
       <td>${fmt.usd(APP_DATA.config.markup)}</td>
-      <td style="color:var(--emerald-600); font-weight:600;">${fmt.usd(r.compra + APP_DATA.config.markup)}</td>
+      <td style="color:var(--emerald-600);font-weight:600">${fmt.usd(r.compra + APP_DATA.config.markup)}</td>
       <td>${fmt.date(r.vigDesde)}</td>
       <td>${fmt.date(r.vigHasta)}</td>
-      <td>${r.estado}</td>
-      <td>${r.esUltima}</td>
-      <td>${r.esProxima}</td>
-      <td>${r.tipo}</td>
-      <td>${r.uso}</td>
-      <td>${r.fuente}</td>
-      <td>${r.clasificacion}</td>
-    </tr>`;
+      <td>${r.estado || '—'}</td>
+      <td>${r.esUltima || '—'}</td>
+      <td>${r.esProxima || '—'}</td>
+      <td>${r.tipo || '—'}</td>
+      <td>${r.uso || '—'}</td>
+      <td>${r.fuente || '—'}</td>
+      <td>${r.clasificacion || '—'}</td>
+    </tr>`).join('');
+}
+
+function applyDataHubFilters() {
+  const carrier = document.getElementById('dh-filter-carrier')?.value || '';
+  const pod     = document.getElementById('dh-filter-pod')?.value || '';
+  const equipo  = document.getElementById('dh-filter-equipo')?.value || '';
+  const estado  = document.getElementById('dh-filter-estado')?.value || '';
+
+  const normalizeEstado = value => String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+  const estadoFiltro = normalizeEstado(estado);
+  const registros = (APP_DATA.baseHistorica || []).filter(r => {
+    if (carrier && r.carrier !== carrier) return false;
+    if (pod     && r.pod     !== pod)     return false;
+    if (equipo  && r.equipo  !== equipo)  return false;
+    if (estado  && normalizeEstado(r.estado) !== estadoFiltro) return false;
+    return true;
   });
 
-  html += '</tbody>';
-  document.getElementById('datahub-table').innerHTML = html;
+  renderDataHubRows(registros);
+}
+
+function resetDataHubFilters() {
+  ['dh-filter-carrier','dh-filter-pod','dh-filter-equipo','dh-filter-estado']
+    .forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.value = '';
+    });
+  renderDataHubRows(APP_DATA.baseHistorica || []);
+}
+
+function renderDataHub() {
+  const registros = APP_DATA.baseHistorica || [];
+  const table = document.getElementById('datahub-table');
+  if (!table) return;
+  if (!table.querySelector('tbody')) {
+    table.innerHTML += '<tbody></tbody>';
+  }
+  renderDataHubRows(registros);
 }
 
 /* =========================================================================
