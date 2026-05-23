@@ -2781,6 +2781,28 @@ button[disabled] { opacity: 0.45; cursor: not-allowed; }
   font-variant-numeric: tabular-nums;
 }
 
+
+/* R1B-3 — Panorama benchmark/reference treatment */
+#section-panorama .rank-table tr.rank-reference td {
+  background: var(--gray-50) !important;
+  color: var(--gray-500);
+}
+
+#section-panorama .rank-table tr.rank-reference strong {
+  color: var(--gray-600);
+}
+
+#section-panorama .rank-table tr.rank-reference .rank-num {
+  background: var(--gray-200);
+  color: var(--gray-600);
+}
+
+#section-panorama .status-pill--referencia {
+  background: var(--gray-100);
+  color: var(--gray-600);
+  border: 1px solid var(--gray-200);
+}
+
 /* Anti-flash: ocultar contenido pre-renderizado hasta que JS lo reemplace */
 body.app-booting #snapshot-table,
 body.app-booting #tarifario-table,
@@ -5551,9 +5573,9 @@ function renderRanking() {
           <thead><tr><th>#</th><th>Carrier</th><th>USD</th></tr></thead>
           <tbody>
             ${list.map((t, i) => `
-              <tr class="${i===0 && !t.esReferencia ? 'rank-1' : ''}">
+              <tr class="${i===0 && !t.esReferencia ? 'rank-1' : ''} ${t.esReferencia ? 'rank-reference' : ''}">
                 <td><span class="rank-num">${i+1}</span></td>
-                <td><strong>${t.carrier}</strong>${t.esReferencia ? ' <span class="status-pill status-pill--proxima">Referencia</span>' : ''}</td>
+                <td><strong>${t.carrier}</strong>${t.esReferencia ? ' <span class="status-pill status-pill--referencia">Referencia / no recomendar</span>' : ''}</td>
                 <td style="text-align:right">${fmt.usd(t.compraOp ?? t.compra)}</td>
               </tr>`).join('')}
           </tbody>
@@ -5820,6 +5842,36 @@ function renderPanoramaInsights() {
       icon: 'target',
       title: 'Mejores oportunidades',
       text: 'No hay suficientes datos operativos para determinar oportunidades destacadas.'
+    });
+  }
+
+  const benchmarksBajoComercial = [];
+  rutas.forEach(([pod, eq]) => {
+    const comerciales = (APP_DATA.tarifas || [])
+      .filter(t => t.pod === pod && t.equipo === eq && t.uso === 'Sí')
+      .map(getTarifaOperativa)
+      .filter(Boolean)
+      .map(t => t.compraOp ?? t.compra)
+      .filter(v => typeof v === 'number' && Number.isFinite(v));
+    if (!comerciales.length) return;
+    const minComercial = Math.min(...comerciales);
+    (APP_DATA.benchmarkTarifas || [])
+      .filter(t => t.pod === pod && t.equipo === eq && (String(t.esUltima).startsWith('S') || String(t.esProxima).startsWith('S')))
+      .forEach(t => {
+        const proxActiva = t.proxCompra && t.proxDesde && parseLocalDate(t.proxDesde) <= TODAY;
+        const compraRef = proxActiva ? t.proxCompra : t.compra;
+        if (typeof compraRef === 'number' && Number.isFinite(compraRef) && compraRef < minComercial) {
+          benchmarksBajoComercial.push(t.carrier + ' en ' + pod + ' — ' + eq + ' (' + fmt.usd(compraRef) + ' vs comercial ' + fmt.usd(minComercial) + ')');
+        }
+      });
+  });
+
+  if (benchmarksBajoComercial.length) {
+    items.push({
+      color: 'amber',
+      icon: 'info',
+      title: 'Referencia de mercado',
+      text: benchmarksBajoComercial.slice(0, 3).join('; ') + ' por debajo de comerciales. Benchmark informativo: no recomendable para oferta.'
     });
   }
 
