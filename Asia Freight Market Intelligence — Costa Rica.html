@@ -3074,7 +3074,7 @@ body.app-booting #datahub-table {
             <!-- Banda Próxima Tarifa -->
             <div class="proxima-band" id="proxima-band" style="display: none;">
               <div class="proxima-band__title">
-                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="bell" aria-hidden="true" class="lucide lucide-bell"><path d="M10.268 21a2 2 0 0 0 3.464 0"></path><path d="M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326"></path></svg> Próxima tarifa
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="bell" aria-hidden="true" class="lucide lucide-bell"><path d="M10.268 21a2 2 0 0 0 3.464 0"></path><path d="M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326"></path></svg> <span id="prox-title">Próxima tarifa</span>
               </div>
               <div class="proxima-band__cell">
                 <span class="label">Próxima compra</span>
@@ -4911,6 +4911,37 @@ function getTarifaAplicableParaSalida(t, fechaSalida) {
   return null;
 }
 
+function isBusinessDay(date) {
+  const day = date.getDay();
+  return day !== 0 && day !== 6;
+}
+
+function businessDaysUntil(fromDate, toDate) {
+  if (!(fromDate instanceof Date) || isNaN(fromDate) || !(toDate instanceof Date) || isNaN(toDate)) return null;
+  if (toDate <= fromDate) return 0;
+  let count = 0;
+  const cursor = new Date(fromDate.getFullYear(), fromDate.getMonth(), fromDate.getDate());
+  const target = new Date(toDate.getFullYear(), toDate.getMonth(), toDate.getDate());
+  cursor.setDate(cursor.getDate() + 1);
+  while (cursor <= target) {
+    if (isBusinessDay(cursor)) count++;
+    cursor.setDate(cursor.getDate() + 1);
+  }
+  return count;
+}
+
+function getProximaTarifaPressure(t) {
+  if (!t || !t.proxCompra || !t.proxDesde) return { activa: false, diasHabiles: null };
+  const proxDesde = parseLocalDate(t.proxDesde);
+  if (!(proxDesde instanceof Date) || isNaN(proxDesde) || proxDesde <= TODAY) return { activa: false, diasHabiles: null };
+  const diasHabiles = businessDaysUntil(TODAY, proxDesde);
+  return {
+    activa: diasHabiles !== null && diasHabiles >= 1 && diasHabiles <= 2,
+    diasHabiles,
+    proxDesde
+  };
+}
+
 function getRecomendacionPorSalida(puerto, equipo, carrierFiltro, fechaSalida, prioridad) {
   const baseRuta = APP_DATA.tarifas.filter(t =>
     t.pod === puerto && t.equipo === equipo && t.uso === 'Sí'
@@ -5205,6 +5236,8 @@ function updateRecomendador() {
   const aplicada = r.aplicacion;
   const venta = aplicada.venta;
   const dias = diasRestantes(aplicada.vigHasta);
+  const proxPressure = getProximaTarifaPressure(t);
+  const debeValidarProxima = !aplicada.usaProxima && proxPressure.activa;
 
   document.getElementById('recom-carrier').textContent = aplicada.carrier;
   const badgeTexto = aplicada.usaProxima ? 'Próxima tarifa'
@@ -5222,12 +5255,20 @@ function updateRecomendador() {
   if (setHTMLIfChanged(vigenciaEl, vigenciaHtml)) htmlChanged = true;
 
   if (t.proxCompra) {
-    document.getElementById('proxima-band').style.display = 'grid';
+    const proximaBand = document.getElementById('proxima-band');
+    proximaBand.style.display = 'grid';
+    proximaBand.style.borderColor = debeValidarProxima ? 'var(--amber-500)' : '';
+    proximaBand.style.background = debeValidarProxima ? 'linear-gradient(135deg, var(--amber-50), #FFFBEB)' : '';
+    const proxTitle = document.getElementById('prox-title');
+    if (proxTitle) proxTitle.textContent = debeValidarProxima ? 'Validar próxima tarifa' : 'Próxima tarifa';
     document.getElementById('prox-compra').textContent = Math.round(t.proxCompra).toLocaleString('es-CR').replace(/,/g,' ');
     document.getElementById('prox-venta').textContent  = Math.round(calcVenta(t.proxCompra)).toLocaleString('es-CR').replace(/,/g,' ');
     document.getElementById('prox-fecha').textContent  = fmt.dateShort(t.proxDesde);
   } else {
-    document.getElementById('proxima-band').style.display = 'none';
+    const proximaBand = document.getElementById('proxima-band');
+    proximaBand.style.display = 'none';
+    proximaBand.style.borderColor = '';
+    proximaBand.style.background = '';
   }
 
   const altRows = r.todasRuta.map((alt, i) => {
@@ -5296,13 +5337,22 @@ function updateRecomendador() {
   }
 
   if (!aplicada.usaProxima && t.proxCompra) {
-    const subeC = t.proxCompra - t.compra;
-    const subeV = calcVenta(t.proxCompra) - calcVenta(t.compra);
-    comentarios += `
-      <div class="alert alert--blue">
-        <i data-lucide="info"></i>
-        <div>Próxima tarifa <strong>${subeC>=0?'sube':'baja'} ${fmt.usd(Math.abs(subeC))}</strong> en compra / <strong>${fmt.usd(Math.abs(subeV))}</strong> en venta. Rige desde ${fmt.dateShort(t.proxDesde)}.</div>
-      </div>`;
+    const subeC = t.proxCompra - aplicada.compra;
+    const subeV = calcVenta(t.proxCompra) - venta;
+    if (debeValidarProxima) {
+      const diasTxt = proxPressure.diasHabiles === 1 ? '1 día hábil' : proxPressure.diasHabiles + ' días hábiles';
+      comentarios += `
+        <div class="alert alert--amber">
+          <i data-lucide="alert-triangle"></i>
+          <div><strong>Validar próxima tarifa.</strong> Entra en ${diasTxt} (${fmt.dateShort(t.proxDesde)}). La tarifa actual sigue aplicando para la fecha seleccionada, pero pricing debe validar antes de cerrar porque la próxima compra ${subeC>=0?'sube':'baja'} ${fmt.usd(Math.abs(subeC))}.</div>
+        </div>`;
+    } else {
+      comentarios += `
+        <div class="alert alert--blue">
+          <i data-lucide="info"></i>
+          <div>Próxima tarifa <strong>${subeC>=0?'sube':'baja'} ${fmt.usd(Math.abs(subeC))}</strong> en compra / <strong>${fmt.usd(Math.abs(subeV))}</strong> en venta. Rige desde ${fmt.dateShort(t.proxDesde)}.</div>
+        </div>`;
+    }
   }
 
   if (r.sinCobertura.length) {
@@ -5344,6 +5394,10 @@ function updateRecomendador() {
       <span class="lbl">Días de validez</span>
       <span class="val" style="color:${dias<=0?'var(--red-500)':'var(--navy-900)'};">${Math.max(dias,0)}</span>
     </div>
+    ${debeValidarProxima ? `
+    <div class="resumen-row">
+      <span class="lbl">Riesgo comercial</span><span class="val" style="color:var(--amber-600);">Validar próxima tarifa</span>
+    </div>` : ''}
   `;
   const resumenEl = document.getElementById('resumen-body');
   if (setHTMLIfChanged(resumenEl, resumenHtml)) htmlChanged = true;
