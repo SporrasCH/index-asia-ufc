@@ -6116,42 +6116,44 @@ function exportDataHubCsv() {
     return true;
   });
 
+  const SEP = ';';
+  const q = v => '"' + String(v === null || v === undefined ? '' : v).replace(/"/g, '""') + '"';
+
   const headers = ['ID','Fecha','Carrier','POD','Equipo','Compra USD',
     'Markup USD','Venta USD','Vig. Desde','Vig. Hasta',
-    'Estado','Es Última','Es Próxima','Tipo','Uso Comercial','Fuente','Clasificación'];
+    'Estado','Es Ultima','Es Proxima','Tipo','Uso Comercial','Fuente','Clasificacion'];
 
-  const escCsv = v => '"' + String(v ?? '').replace(/"/g, '""') + '"';
   const rows = registros.map(r => [
-    r.id,
-    r.fecha,
-    r.carrier,
-    r.pod,
-    r.equipo,
-    r.compra,
-    APP_DATA.config.markup,
-    r.compra + APP_DATA.config.markup,
-    r.vigDesde || '',
-    r.vigHasta || '',
-    r.estado || '',
-    r.esUltima || '',
-    r.esProxima || '',
-    r.tipo || '',
-    r.uso || '',
-    r.fuente || '',
-    r.clasificacion || ''
-  ].map(escCsv).join(','));
+    q(r.id),
+    q(r.fecha),
+    q(r.carrier),
+    q(r.pod),
+    q(r.equipo),
+    q(r.compra),
+    q(APP_DATA.config.markup),
+    q(r.compra + APP_DATA.config.markup),
+    q(r.vigDesde),
+    q(r.vigHasta),
+    q(r.estado),
+    q(r.esUltima),
+    q(r.esProxima),
+    q(r.tipo),
+    q(r.uso),
+    q(r.fuente),
+    q(r.clasificacion)
+  ].join(SEP));
 
-  const csv = [headers.join(','), ...rows].join('\n');
+  const bom = '\uFEFF';
+  const csv = bom + [headers.map(q).join(SEP), ...rows].join('\r\n');
   const date = new Date().toISOString().slice(0,10).replace(/-/g,'');
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
   const url  = URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.href = url;
-  link.download = `DataHub-Asia-UFC-${date}.csv`;
+  link.download = 'DataHub-Asia-UFC-' + date + '.csv';
   link.click();
   URL.revokeObjectURL(url);
 }
-
 function renderDataHub() {
   const registros = APP_DATA.baseHistorica || [];
   const table = document.getElementById('datahub-table');
