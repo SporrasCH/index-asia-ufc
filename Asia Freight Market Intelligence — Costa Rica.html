@@ -6104,7 +6104,7 @@ function buildDataHubResumen() {
   const estado  = document.getElementById('dh-filter-estado')?.value || '';
   const desde   = document.getElementById('dh-filter-desde')?.value || '';
   const hasta   = document.getElementById('dh-filter-hasta')?.value || '';
-  const norm    = v => String(v || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+  const norm    = v => String(v || '').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
 
   const registros = (APP_DATA.baseHistorica || []).filter(r => {
     if (carrier && r.carrier !== carrier) return false;
@@ -6121,71 +6121,130 @@ function buildDataHubResumen() {
     return;
   }
 
-  const markup = APP_DATA.config.markup;
-  const carriers = ['MSC', 'ONE', 'CMA'];
-  const pods = pod ? [pod] : ['Caldera', 'Moin'];
-  const equipos = equipo ? [equipo] : ['20GP', '40HQ'];
+  const carriers  = ['MSC', 'ONE', 'CMA'];
+  const pods      = pod    ? [pod]    : ['Caldera', 'Moin'];
+  const equipos   = equipo ? [equipo] : ['20GP', '40HQ'];
+
+  const fmt = v => v != null ? '$' + Number(v).toLocaleString('es-CR') : '—';
+  const pct = (a, b) => a && b ? (((b - a) / a) * 100).toFixed(1) + '%' : '—';
+  const arrow = (a, b) => !a || !b ? '' : b > a ? '↑' : b < a ? '↓' : '→';
 
   const periodoLabel = desde || hasta
-    ? `${desde || '—'} → ${hasta || '—'}`
+    ? `${desde || 'inicio'} → ${hasta || 'hoy'}`
     : 'Todos los períodos';
 
-  const filtrosLabel = [
-    carrier ? `Carrier: ${carrier}` : '',
-    pod     ? `POD: ${pod}`         : '',
-    equipo  ? `Equipo: ${equipo}`   : '',
-    estado  ? `Estado: ${estado}`   : '',
-  ].filter(Boolean).join(' · ') || 'Sin filtros adicionales';
-
-  let lines = [];
-  lines.push('RESUMEN DE TARIFAS — ASIA FREIGHT');
-  lines.push('═'.repeat(48));
+  const lines = [];
+  lines.push('ANÁLISIS DE MERCADO — ASIA → COSTA RICA');
+  lines.push('United Freight Cargo');
+  lines.push('═'.repeat(52));
   lines.push(`Período  : ${periodoLabel}`);
-  lines.push(`Filtros  : ${filtrosLabel}`);
   lines.push(`Registros: ${registros.length}`);
   lines.push('');
+
+  // Ranking global de competitividad
+  const rankScore = {};
+  carriers.forEach(c => { rankScore[c] = 0; });
+
+  const rutaBlocks = [];
 
   pods.forEach(p => {
     equipos.forEach(eq => {
       const rutaRegs = registros.filter(r => r.pod === p && r.equipo === eq);
       if (!rutaRegs.length) return;
 
-      lines.push(`─── ${p} · ${eq} ${'─'.repeat(30 - p.length - eq.length)}`);
+      const block = { ruta: `${p} · ${eq}`, carriers: [] };
+      let minCompra = Infinity;
+      let minCarrier = null;
 
-      let mejor = null;
       carriers.forEach(c => {
-        const regs = rutaRegs.filter(r => r.carrier === c);
+        const regs = rutaRegs
+          .filter(r => r.carrier === c)
+          .sort((a, b) => (a.vigDesde || '').localeCompare(b.vigDesde || ''));
         if (!regs.length) return;
 
-        // Tarifa más reciente del carrier en este filtro
-        const sorted = regs.slice().sort((a, b) => (b.vigDesde || '').localeCompare(a.vigDesde || ''));
-        const last = sorted[0];
-        const compra = last.compra;
-        const venta  = compra + markup;
+        const apertura  = regs[0].compra;
+        const cierre    = regs[regs.length - 1].compra;
+        const promedio  = Math.round(regs.reduce((s, r) => s + r.compra, 0) / regs.length);
+        const variacion = pct(apertura, cierre);
+        const dir       = arrow(apertura, cierre);
 
-        if (!mejor || compra < mejor.compra) mejor = { carrier: c, compra };
+        if (cierre < minCompra) { minCompra = cierre; minCarrier = c; }
 
-        const vigStr = last.vigDesde
-          ? `${last.vigDesde} → ${last.vigHasta || '?'}`
-          : 'sin vigencia';
-
-        lines.push(`  ${c.padEnd(6)} Compra $${String(compra).padStart(5)}  Venta $${String(venta).padStart(5)}   ${vigStr}`);
+        block.carriers.push({ c, apertura, cierre, promedio, variacion, dir });
       });
 
-      if (mejor) {
-        lines.push(`  → Mejor precio: ${mejor.carrier} ($${mejor.compra})`);
-      }
-      lines.push('');
+      if (minCarrier) rankScore[minCarrier]++;
+      block.mejor = minCarrier;
+      block.mejorCompra = minCompra;
+      rutaBlocks.push(block);
     });
   });
 
-  lines.push('═'.repeat(48));
-  lines.push(`Generado: ${new Date().toLocaleString('es-CR')}`);
-  lines.push(`Markup aplicado: $${markup} USD fijo`);
+  // Render bloques por ruta
+  rutaBlocks.forEach(block => {
+    lines.push(`─── ${block.ruta} ${'─'.repeat(Math.max(0, 40 - block.ruta.length))}`);
+    lines.push(`  ${'Carrier'.padEnd(8)} ${'Apertura'.padStart(10)} ${'Cierre'.padStart(10)} ${'Promedio'.padStart(10)}  ${'Var.'.padStart(8)}`);
+    block.carriers.forEach(({ c, apertura, cierre, promedio, variacion, dir }) => {
+      lines.push(
+        `  ${c.padEnd(8)}` +
+        `${fmt(apertura).padStart(10)}` +
+        `${fmt(cierre).padStart(10)}` +
+        `${fmt(promedio).padStart(10)}` +
+        `  ${(dir + ' ' + variacion).padStart(8)}`
+      );
+    });
+    if (block.mejor) {
+      lines.push(`  → Mejor cierre del período: ${block.mejor} (${fmt(block.mejorCompra)})`);
+    }
+    lines.push('');
+  });
+
+  // Ranking competitividad
+  lines.push('─── RANKING DE COMPETITIVIDAD ─────────────────────');
+  const sorted = carriers
+    .filter(c => rankScore[c] > 0)
+    .sort((a, b) => rankScore[b] - rankScore[a]);
+  sorted.forEach((c, i) => {
+    lines.push(`  ${i + 1}. ${c.padEnd(6)} · Mejor precio en ${rankScore[c]} de ${rutaBlocks.length} rutas`);
+  });
+  const sinLiderazgo = carriers.filter(c => !rankScore[c]);
+  sinLiderazgo.forEach(c => {
+    lines.push(`  —  ${c.padEnd(6)} · Sin liderazgo en el período`);
+  });
+  lines.push('');
+
+  // Conclusiones automáticas
+  lines.push('─── CONCLUSIONES ───────────────────────────────────');
+  const lider = sorted[0];
+  if (lider) lines.push(`  · Carrier más competitivo: ${lider} (mejor en ${rankScore[lider]} rutas)`);
+
+  // Tendencia general
+  let subidas = 0, bajadas = 0, estables = 0;
+  rutaBlocks.forEach(b => b.carriers.forEach(({ dir }) => {
+    if (dir === '↑') subidas++;
+    else if (dir === '↓') bajadas++;
+    else estables++;
+  }));
+  if (subidas > bajadas) lines.push('  · Tendencia del período: ALCISTA — costos en aumento');
+  else if (bajadas > subidas) lines.push('  · Tendencia del período: BAJISTA — costos a la baja');
+  else lines.push('  · Tendencia del período: ESTABLE — mercado sin variación significativa');
+
+  // Mayor variación
+  let maxVar = 0; let maxLabel = '';
+  rutaBlocks.forEach(b => b.carriers.forEach(({ c, apertura, cierre }) => {
+    if (!apertura || !cierre) return;
+    const v = Math.abs((cierre - apertura) / apertura);
+    if (v > maxVar) { maxVar = v; maxLabel = `${c} ${b.ruta}`; }
+  }));
+  if (maxLabel) lines.push(`  · Mayor variación: ${maxLabel} (${(maxVar * 100).toFixed(1)}%)`);
+
+  lines.push('');
+  lines.push('═'.repeat(52));
+  lines.push(`Generado: ${new Date().toLocaleDateString('es-CR', { year:'numeric', month:'long', day:'numeric' })}`);
+  lines.push('Asia Freight Market Intelligence — UFC');
 
   const texto = lines.join('\n');
 
-  // Abrir en el modal de exports existente
   const modal = document.getElementById('summary-modal');
   const output = document.getElementById('summary-output');
   if (modal && output) {
