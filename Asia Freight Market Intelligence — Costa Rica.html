@@ -2762,6 +2762,25 @@ button[disabled] { opacity: 0.45; cursor: not-allowed; }
   text-align: center;
 }
 
+
+/* R1B-2.1 — Panorama summary table alignment */
+#section-panorama .summary-table th,
+#section-panorama .summary-table td {
+  text-align: center;
+}
+
+#section-panorama .summary-table th:first-child,
+#section-panorama .summary-table td:first-child {
+  text-align: left;
+}
+
+#section-panorama .summary-table .num,
+#section-panorama .summary-table .spread,
+#section-panorama .summary-table .reco {
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
 /* Anti-flash: ocultar contenido pre-renderizado hasta que JS lo reemplace */
 body.app-booting #snapshot-table,
 body.app-booting #tarifario-table,
