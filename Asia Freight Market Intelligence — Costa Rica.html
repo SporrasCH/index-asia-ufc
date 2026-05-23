@@ -7434,7 +7434,57 @@ function confirmAdminExcel() {
   if (typeof initCharts === 'function') initCharts();
 
   closeAdminExcel();
-  alert(`✓ ${allRows.length} tarifas importadas correctamente.`);
+  if (confirm(`✓ ${allRows.length} tarifas importadas correctamente.
+
+¿Descargar el HTML actualizado ahora para subir a GitHub?`)) {
+    downloadUpdatedHtml();
+  }
+}
+
+function downloadUpdatedHtml() {
+  const src = document.documentElement.outerHTML;
+
+  // Serializar los tres arrays de APP_DATA como JS literal
+  function serializeEntry(obj) {
+    const parts = Object.entries(obj).map(([k, v]) => {
+      if (v === null) return `${k}:null`;
+      if (typeof v === 'number') return `${k}:${v}`;
+      return `${k}:${JSON.stringify(v)}`;
+    });
+    return '    { ' + parts.join(', ') + ' }';
+  }
+
+  const tarifasStr = (APP_DATA.tarifas || []).map(serializeEntry).join(',\n');
+  const benchStr   = (APP_DATA.benchmarkTarifas || []).map(serializeEntry).join(',\n');
+  const baseStr    = (APP_DATA.baseHistorica || []).map(serializeEntry).join(',\n');
+
+  const newBlock =
+    '// AUTO DATA START\n' +
+    '  // Tarifas comerciales vigentes (derivadas de Base_Historico: Uso Comercial = Si y Es Ultima = Si)\n' +
+    '  tarifas: [\n' + tarifasStr + '\n  ],\n' +
+    '  benchmarkTarifas: [\n' + benchStr + '\n  ],\n' +
+    '  baseHistorica: [\n' + baseStr + '\n  ],\n  // AUTO DATA END';
+
+  const marker_start = '// AUTO DATA START';
+  const marker_end   = '// AUTO DATA END';
+  const i1 = src.indexOf(marker_start);
+  const i2 = src.indexOf(marker_end) + marker_end.length;
+
+  if (i1 < 0 || i2 < marker_end.length) {
+    alert('⚠ No se encontraron los markers AUTO DATA. Contactá al administrador.');
+    return;
+  }
+
+  const updated = src.slice(0, i1) + newBlock + src.slice(i2);
+
+  const date = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+  const blob = new Blob([updated], { type: 'text/html;charset=utf-8' });
+  const url  = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href     = url;
+  link.download = `Asia-Freight-UFC-${date}.html`;
+  link.click();
+  URL.revokeObjectURL(url);
 }
 /* -- FIN ADMIN EXCEL -- */
 
