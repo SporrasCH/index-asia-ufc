@@ -3877,48 +3877,64 @@ body.app-booting #datahub-table {
           <span class="datahub-note__item"><span class="status-pill status-pill--proxima">Proxima</span> tarifa futura cargada</span>
           <span class="datahub-note__item"><span class="status-pill status-pill--sin-datos">Sin datos</span> pendiente de validar</span>
         </div>
-        <div class="tarifario-filters" id="datahub-filters" style="margin-bottom:16px">
-          <div class="filter-field">
-            <label class="filter-label">Carrier</label>
-            <select id="dh-filter-carrier" class="filter-select" onchange="applyDataHubFilters()">
-              <option value="">Todos</option>
-              <option>MSC</option>
-              <option>ONE</option>
-              <option>CMA</option>
-              <option>COSCO</option>
-              <option>PIL</option>
-            </select>
+        <div id="datahub-filters" style="margin-bottom:16px;display:flex;flex-direction:column;gap:10px">
+          <!-- Fila 1: fechas + estado + carrier -->
+          <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end">
+            <div class="filter-field">
+              <label class="filter-label">Vigencia desde</label>
+              <input type="date" id="dh-filter-desde" class="filter-select" onchange="applyDataHubFilters()">
+            </div>
+            <div class="filter-field">
+              <label class="filter-label">Vigencia hasta</label>
+              <input type="date" id="dh-filter-hasta" class="filter-select" onchange="applyDataHubFilters()">
+            </div>
+            <div class="filter-field">
+              <label class="filter-label">Carrier</label>
+              <select id="dh-filter-carrier" class="filter-select" onchange="applyDataHubFilters()">
+                <option value="">Todos</option>
+                <option>MSC</option>
+                <option>ONE</option>
+                <option>CMA</option>
+                <option>COSCO</option>
+                <option>PIL</option>
+              </select>
+            </div>
+            <div class="filter-field">
+              <label class="filter-label">POD</label>
+              <select id="dh-filter-pod" class="filter-select" onchange="applyDataHubFilters()">
+                <option value="">Todos</option>
+                <option>Caldera</option>
+                <option>Moin</option>
+              </select>
+            </div>
+            <div class="filter-field">
+              <label class="filter-label">Equipo</label>
+              <select id="dh-filter-equipo" class="filter-select" onchange="applyDataHubFilters()">
+                <option value="">Todos</option>
+                <option>20GP</option>
+                <option>40HQ</option>
+              </select>
+            </div>
+            <div class="filter-field">
+              <label class="filter-label">Estado</label>
+              <select id="dh-filter-estado" class="filter-select" onchange="applyDataHubFilters()">
+                <option value="">Todos</option>
+                <option>Vigente</option>
+                <option>Próxima</option>
+                <option>Vencida</option>
+              </select>
+            </div>
+            <div style="display:flex;gap:8px;align-self:flex-end">
+              <button class="filter-select" style="cursor:pointer;background:var(--gray-100);border:1px solid var(--gray-200);border-radius:8px;padding:8px 14px;font-size:13px" onclick="resetDataHubFilters()">
+                Limpiar
+              </button>
+              <button class="filter-select" style="cursor:pointer;background:var(--navy-900);color:white;border:none;border-radius:8px;padding:8px 14px;font-size:13px;font-weight:600" onclick="exportDataHubCsv()">
+                ↓ Exportar CSV
+              </button>
+            </div>
           </div>
-          <div class="filter-field">
-            <label class="filter-label">POD</label>
-            <select id="dh-filter-pod" class="filter-select" onchange="applyDataHubFilters()">
-              <option value="">Todos</option>
-              <option>Caldera</option>
-              <option>Moin</option>
-            </select>
-          </div>
-          <div class="filter-field">
-            <label class="filter-label">Equipo</label>
-            <select id="dh-filter-equipo" class="filter-select" onchange="applyDataHubFilters()">
-              <option value="">Todos</option>
-              <option>20GP</option>
-              <option>40HQ</option>
-            </select>
-          </div>
-          <div class="filter-field">
-            <label class="filter-label">Estado</label>
-            <select id="dh-filter-estado" class="filter-select" onchange="applyDataHubFilters()">
-              <option value="">Todos</option>
-              <option>Vigente</option>
-              <option>Próxima</option>
-              <option>Vencida</option>
-            </select>
-          </div>
-          <div class="filter-field" style="align-self:flex-end">
-            <button class="filter-select" style="cursor:pointer;background:var(--gray-100);border:1px solid var(--gray-200);border-radius:8px;padding:8px 16px;font-size:13px" onclick="resetDataHubFilters()">
-              Limpiar filtros
-            </button>
-          </div>
+          <!-- Contador de resultados -->
+          <div id="dh-count" style="font-size:12px;color:var(--gray-500)"></div>
         </div>
         <div class="tarifario-table-wrap" style="overflow-x:auto;">
           <table class="data-hub-table" id="datahub-table"><thead><tr>
@@ -6042,27 +6058,85 @@ function applyDataHubFilters() {
   const pod     = document.getElementById('dh-filter-pod')?.value || '';
   const equipo  = document.getElementById('dh-filter-equipo')?.value || '';
   const estado  = document.getElementById('dh-filter-estado')?.value || '';
+  const desde   = document.getElementById('dh-filter-desde')?.value || '';
+  const hasta   = document.getElementById('dh-filter-hasta')?.value || '';
 
-  const normalizeEstado = value => String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
-  const estadoFiltro = normalizeEstado(estado);
+  const norm = v => String(v || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+
   const registros = (APP_DATA.baseHistorica || []).filter(r => {
     if (carrier && r.carrier !== carrier) return false;
-    if (pod     && r.pod     !== pod)     return false;
-    if (equipo  && r.equipo  !== equipo)  return false;
-    if (estado  && normalizeEstado(r.estado) !== estadoFiltro) return false;
+    if (pod     && r.pod !== pod)         return false;
+    if (equipo  && r.equipo !== equipo)   return false;
+    if (estado  && norm(r.estado) !== norm(estado)) return false;
+    // Filtro por rango de vigencia: la tarifa debe solapar con el rango pedido
+    if (desde && r.vigHasta && r.vigHasta < desde) return false;
+    if (hasta && r.vigDesde && r.vigDesde > hasta)  return false;
     return true;
   });
 
   renderDataHubRows(registros);
+
+  const count = document.getElementById('dh-count');
+  if (count) {
+    const total = (APP_DATA.baseHistorica || []).length;
+    count.textContent = registros.length === total
+      ? `${total} registros`
+      : `${registros.length} de ${total} registros`;
+  }
 }
 
 function resetDataHubFilters() {
-  ['dh-filter-carrier','dh-filter-pod','dh-filter-equipo','dh-filter-estado']
+  ['dh-filter-carrier','dh-filter-pod','dh-filter-equipo',
+   'dh-filter-estado','dh-filter-desde','dh-filter-hasta']
     .forEach(id => {
       const el = document.getElementById(id);
       if (el) el.value = '';
     });
+  const count = document.getElementById('dh-count');
+  if (count) count.textContent = `${(APP_DATA.baseHistorica || []).length} registros`;
   renderDataHubRows(APP_DATA.baseHistorica || []);
+}
+
+function exportDataHubCsv() {
+  const carrier = document.getElementById('dh-filter-carrier')?.value || '';
+  const pod     = document.getElementById('dh-filter-pod')?.value || '';
+  const equipo  = document.getElementById('dh-filter-equipo')?.value || '';
+  const estado  = document.getElementById('dh-filter-estado')?.value || '';
+  const desde   = document.getElementById('dh-filter-desde')?.value || '';
+  const hasta   = document.getElementById('dh-filter-hasta')?.value || '';
+  const norm    = v => String(v || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+
+  const registros = (APP_DATA.baseHistorica || []).filter(r => {
+    if (carrier && r.carrier !== carrier) return false;
+    if (pod     && r.pod !== pod)         return false;
+    if (equipo  && r.equipo !== equipo)   return false;
+    if (estado  && norm(r.estado) !== norm(estado)) return false;
+    if (desde && r.vigHasta && r.vigHasta < desde) return false;
+    if (hasta && r.vigDesde && r.vigDesde > hasta)  return false;
+    return true;
+  });
+
+  const headers = ['ID','Fecha','Carrier','POD','Equipo','Compra USD',
+    'Markup USD','Venta USD','Vig. Desde','Vig. Hasta',
+    'Estado','Es Última','Es Próxima','Tipo','Uso Comercial','Fuente','Clasificación'];
+
+  const rows = registros.map(r => [
+    r.id, r.fecha, r.carrier, r.pod, r.equipo,
+    r.compra, APP_DATA.config.markup, r.compra + APP_DATA.config.markup,
+    r.vigDesde || '', r.vigHasta || '',
+    r.estado || '', r.esUltima || '', r.esProxima || '',
+    r.tipo || '', r.uso || '', r.fuente || '', r.clasificacion || ''
+  ].map(v => `"${v}"`).join(','));
+
+  const csv = [headers.join(','), ...rows].join('\n');
+  const date = new Date().toISOString().slice(0,10).replace(/-/g,'');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+  const url  = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = `DataHub-Asia-UFC-${date}.csv`;
+  link.click();
+  URL.revokeObjectURL(url);
 }
 
 function renderDataHub() {
@@ -6073,6 +6147,8 @@ function renderDataHub() {
     table.innerHTML += '<tbody></tbody>';
   }
   renderDataHubRows(registros);
+  const count = document.getElementById('dh-count');
+  if (count) count.textContent = `${registros.length} registros`;
 }
 
 /* =========================================================================
