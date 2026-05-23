@@ -4353,6 +4353,31 @@ document.querySelectorAll('.nav__item').forEach(btn => {
 /* =========================================================================
    RENDER: SNAPSHOT TABLE (Dashboard)
    ========================================================================= */
+function renderSnapshotVariation(tarifas) {
+  const variaciones = tarifas
+    .filter(Boolean)
+    .map(t => {
+      const compraActual = t.compraOp ?? t.compra;
+      const compraAnterior = getPreviousHistoricalValue(t.carrier, t.pod, t.equipo, compraActual, t.vigDesdeOp || t.vigDesde);
+      if (typeof compraAnterior !== 'number' || !Number.isFinite(compraAnterior)) return null;
+      const variacion = compraActual - compraAnterior;
+      const varPct = compraAnterior !== 0 ? (variacion / compraAnterior) * 100 : 0;
+      return { variacion, varPct };
+    })
+    .filter(Boolean);
+
+  if (!variaciones.length) return '<span class="trend trend--flat">Sin datos</span>';
+
+  const principal = variaciones.slice().sort((a, b) => Math.abs(b.variacion) - Math.abs(a.variacion))[0];
+  if (Math.abs(principal.variacion) < 30) {
+    return '<span class="trend trend--flat">— Sin cambio</span>';
+  }
+
+  const cls = principal.variacion > 0 ? 'trend--up' : 'trend--down';
+  const arrow = principal.variacion > 0 ? '▲' : '▼';
+  const sign = principal.variacion > 0 ? '+' : '-';
+  return '<span class="trend ' + cls + '">' + arrow + ' ' + sign + fmt.usd(Math.abs(principal.variacion)) + '</span>';
+}
 function renderSnapshot() {
   const carriers = ['MSC','ONE','CMA'];
   const equipos  = [['Moin','20GP'],['Moin','40HQ'],['Caldera','20GP'],['Caldera','40HQ']];
@@ -4386,13 +4411,8 @@ function renderSnapshot() {
       return base ? getTarifaOperativa(base) : null;
     });
     const primera = tarifas.find(Boolean);
-    const tendencia = primera?.tendencia || 'flat';
     const dias = primera ? diasRestantes(primera.vigHastaOp || primera.vigHasta) : null;
-
-    let tendenciaHtml;
-    if (tendencia === 'up')   tendenciaHtml = '<span class="trend trend--up">▲</span>';
-    else if (tendencia === 'down') tendenciaHtml = '<span class="trend trend--down">▼</span>';
-    else tendenciaHtml = '<span class="trend trend--flat"><span class="dot dot--gray"></span> Sin cambio</span>';
+    const tendenciaHtml = renderSnapshotVariation(tarifas);
 
     let venceHtml;
     if (dias === null) venceHtml = '—';
