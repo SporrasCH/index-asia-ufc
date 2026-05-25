@@ -11202,19 +11202,52 @@ function confirmAdminExcel() {
   if (!APP_DATA.baseHistorica) APP_DATA.baseHistorica = [];
   let insertadas = 0;
   let omitidas = 0;
+  let actualizadas = 0;
+  const hoy = new Date().toISOString().split('T')[0];
+
   allRows.forEach(r => {
-    const duplicado = APP_DATA.baseHistorica.some(existing =>
+    // Duplicado real: misma ruta+vigencia+precio importada el mismo día
+    const idxDup = APP_DATA.baseHistorica.findIndex(existing =>
+      existing.carrier  === r.carrier  &&
+      existing.pod      === r.pod      &&
+      existing.equipo   === r.equipo   &&
+      existing.vigDesde === r.vigDesde &&
+      existing.vigHasta === r.vigHasta &&
+      existing.fecha    === hoy        &&
+      existing.compra   === r.compra
+    );
+    if (idxDup !== -1) { omitidas++; return; }
+
+    // Misma ruta+vigencia pero precio distinto (cualquier día) → actualizar
+    const idxUpd = APP_DATA.baseHistorica.findIndex(existing =>
       existing.carrier  === r.carrier  &&
       existing.pod      === r.pod      &&
       existing.equipo   === r.equipo   &&
       existing.vigDesde === r.vigDesde &&
       existing.vigHasta === r.vigHasta
     );
-    if (duplicado) { omitidas++; return; }
+    if (idxUpd !== -1) {
+      APP_DATA.baseHistorica[idxUpd].compra = r.compra;
+      APP_DATA.baseHistorica[idxUpd].markup = APP_DATA.config.markup;
+      APP_DATA.baseHistorica[idxUpd].venta  = r.compra + APP_DATA.config.markup;
+      APP_DATA.baseHistorica[idxUpd].fecha  = hoy;
+      actualizadas++;
+      return;
+    }
+
+    // Nueva tarifa — desactivar esUltima en anteriores del mismo carrier+pod+equipo
+    APP_DATA.baseHistorica.forEach(existing => {
+      if (existing.carrier === r.carrier &&
+          existing.pod     === r.pod     &&
+          existing.equipo  === r.equipo) {
+        existing.esUltima = 'No';
+      }
+    });
+
     insertadas++;
     APP_DATA.baseHistorica.push({
       id: r.id,
-      fecha: r.fecha,
+      fecha: hoy,
       carrier: r.carrier,
       pod: r.pod,
       equipo: r.equipo,
@@ -11224,7 +11257,7 @@ function confirmAdminExcel() {
       vigDesde: r.vigDesde,
       vigHasta: r.vigHasta,
       estado: r.estado,
-      esUltima: r.esUltima,
+      esUltima: r.uso === 'Sí' ? 'Sí' : 'No',
       esProxima: r.esProxima,
       tipo: r.tipo,
       uso: r.uso,
