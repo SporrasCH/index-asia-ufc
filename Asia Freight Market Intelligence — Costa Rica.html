@@ -7484,6 +7484,14 @@ destinoConfig: {
   Moin:    { cargosDestino: 645, deliveryGAM: 885 },
   Caldera: { cargosDestino: 525, deliveryGAM: 610 }
 },
+    rutasConfig: {
+  'CMA|Caldera':  { rutaNaviera: 'Vía Buenaventura, CO', transitTime: '55-60 días aprox' },
+  'MSC|Caldera':  { rutaNaviera: 'Vía Rodman, PA',        transitTime: '45-50 días aprox' },
+  'ONE|Caldera':  { rutaNaviera: 'Vía Lázaro Cárdenas, MX', transitTime: '35-45 días aprox' },
+  'CMA|Moin':     { rutaNaviera: 'Vía Cartagena, CO',     transitTime: '48-55 días aprox' },
+  'MSC|Moin':     { rutaNaviera: 'Vía Cristóbal, PA',     transitTime: '38-45 días aprox' },
+  'ONE|Moin':     { rutaNaviera: 'Vía Manzanillo, PA',    transitTime: '35-45 días aprox' },
+},
     fuente: 'Parisi',
     // AUTO CONFIG START
     fechaHoy: '2026-05-22',
@@ -7513,21 +7521,7 @@ destinoConfig: {
     }
   ],
   // AUTO DATA START
-  // Tarifas comerciales vigentes (derivadas de Base_Historico: Uso Comercial = Si y Es Ultima = Si)
-  tarifas: [
-    { id:"TAR-0175", carrier:"CMA", pod:"Caldera", equipo:"20GP", compra:4630, vigDesde:"2026-05-22", vigHasta:"2026-05-28", tendencia:"down", proxCompra:5130, proxDesde:"2026-05-29", proxHasta:"2026-06-07", uso:"Sí", tipo:"Contract", clasificacion:"Principal", rutaNaviera:"Vía Buenaventura, CO", transitTime:"55-60 días aprox" },
-    { id:"TAR-0159", carrier:"MSC", pod:"Caldera", equipo:"20GP", compra:4700, vigDesde:"2026-05-22", vigHasta:"2026-05-28", tendencia:"up", proxCompra:5200, proxDesde:"2026-05-29", proxHasta:"2026-06-07", uso:"Sí", tipo:"Contract", clasificacion:"Principal", rutaNaviera:"Vía Rodman, PA", transitTime:"45-50 días aprox" },
-    { id:"TAR-0171", carrier:"ONE", pod:"Caldera", equipo:"20GP", compra:4500, vigDesde:"2026-05-22", vigHasta:"2026-05-28", tendencia:"up", proxCompra:null, proxDesde:null, proxHasta:null, uso:"Sí", tipo:"Contract", clasificacion:"Principal", rutaNaviera:"Vía Lázaro Cárdenas, MX", transitTime:"35-45 días aprox" },
-    { id:"TAR-0176", carrier:"CMA", pod:"Caldera", equipo:"40HQ", compra:4830, vigDesde:"2026-05-22", vigHasta:"2026-05-28", tendencia:"down", proxCompra:5330, proxDesde:"2026-05-29", proxHasta:"2026-06-07", uso:"Sí", tipo:"Contract", clasificacion:"Principal", rutaNaviera:"Vía Buenaventura, CO", transitTime:"55-60 días aprox" },
-    { id:"TAR-0160", carrier:"MSC", pod:"Caldera", equipo:"40HQ", compra:5000, vigDesde:"2026-05-22", vigHasta:"2026-05-28", tendencia:"up", proxCompra:5500, proxDesde:"2026-05-29", proxHasta:"2026-06-07", uso:"Sí", tipo:"Contract", clasificacion:"Principal", rutaNaviera:"Vía Rodman, PA", transitTime:"45-50 días aprox" },
-    { id:"TAR-0172", carrier:"ONE", pod:"Caldera", equipo:"40HQ", compra:4800, vigDesde:"2026-05-22", vigHasta:"2026-05-28", tendencia:"up", proxCompra:null, proxDesde:null, proxHasta:null, uso:"Sí", tipo:"Contract", clasificacion:"Principal", rutaNaviera:"Vía Lázaro Cárdenas, MX", transitTime:"35-45 días aprox" },
-    { id:"TAR-0165", carrier:"CMA", pod:"Moin", equipo:"20GP", compra:5170, vigDesde:"2026-05-22", vigHasta:"2026-05-31", tendencia:"up", proxCompra:null, proxDesde:null, proxHasta:null, uso:"Sí", tipo:"Contract", clasificacion:"Principal", rutaNaviera:"Vía Cartagena, CO", transitTime:"48-55 días aprox" },
-    { id:"TAR-0177", carrier:"MSC", pod:"Moin", equipo:"20GP", compra:4650, vigDesde:"2026-05-22", vigHasta:"2026-05-28", tendencia:"down", proxCompra:4950, proxDesde:"2026-05-29", proxHasta:"2026-06-07", uso:"Sí", tipo:"Contract", clasificacion:"Principal", rutaNaviera:"Vía Cristóbal, PA", transitTime:"38-45 días aprox" },
-    { id:"TAR-0155", carrier:"ONE", pod:"Moin", equipo:"20GP", compra:3740, vigDesde:"2026-05-16", vigHasta:"2026-05-22", tendencia:"flat", proxCompra:4540, proxDesde:"2026-05-23", proxHasta:"2026-05-31", uso:"Sí", tipo:"Contract", clasificacion:"Principal", rutaNaviera:"Vía Manzanillo, PA", transitTime:"35-45 días aprox" },
-    { id:"TAR-0166", carrier:"CMA", pod:"Moin", equipo:"40HQ", compra:5510, vigDesde:"2026-05-22", vigHasta:"2026-05-31", tendencia:"up", proxCompra:null, proxDesde:null, proxHasta:null, uso:"Sí", tipo:"Contract", clasificacion:"Principal", rutaNaviera:"Vía Cartagena, CO", transitTime:"48-55 días aprox" },
-    { id:"TAR-0178", carrier:"MSC", pod:"Moin", equipo:"40HQ", compra:4800, vigDesde:"2026-05-22", vigHasta:"2026-05-28", tendencia:"down", proxCompra:5300, proxDesde:"2026-05-29", proxHasta:"2026-06-07", uso:"Sí", tipo:"Contract", clasificacion:"Principal", rutaNaviera:"Vía Cristóbal, PA", transitTime:"38-45 días aprox" },
-    { id:"TAR-0156", carrier:"ONE", pod:"Moin", equipo:"40HQ", compra:3780, vigDesde:"2026-05-16", vigHasta:"2026-05-22", tendencia:"flat", proxCompra:4580, proxDesde:"2026-05-23", proxHasta:"2026-05-31", uso:"Sí", tipo:"Contract", clasificacion:"Principal", rutaNaviera:"Vía Manzanillo, PA", transitTime:"35-45 días aprox" }
-  ],
+  // tarifas[] se genera en runtime via buildTarifasRuntime() — no se serializa
   benchmarkTarifas: [
     { id:"TAR-0141", fecha:"2026-05-06", carrier:"PIL", pod:"Caldera", equipo:"20GP", compra:4100, vigDesde:"2026-05-15", vigHasta:"2026-05-21", estado:"Vencida", esUltima:"Sí", esProxima:"No", tipo:"Contract", uso:"No", fuente:"Parisi", clasificacion:"Referencia" },
     { id:"TAR-0142", fecha:"2026-05-06", carrier:"PIL", pod:"Caldera", equipo:"40HQ", compra:4300, vigDesde:"2026-05-15", vigHasta:"2026-05-21", estado:"Vencida", esUltima:"Sí", esProxima:"No", tipo:"Contract", uso:"No", fuente:"Parisi", clasificacion:"Referencia" },
@@ -11294,6 +11288,7 @@ function confirmAdminExcel() {
   if (omitidas > 0) {
     console.info(`Admin Excel: ${omitidas} tarifas omitidas por duplicado, ${insertadas} insertadas.`);
   }
+  buildTarifasRuntime();
   if (typeof initHistorico === 'function') initHistorico();
   if (typeof renderDataHub === 'function') renderDataHub();
   if (typeof renderSemaforo === 'function') renderSemaforo();
@@ -11360,15 +11355,13 @@ function downloadUpdatedHtml() {
     return '    { ' + parts.join(', ') + ' }';
   }
 
-  const tarifasStr = (APP_DATA.tarifas || []).map(serializeEntry).join(',\n');
   const benchStr   = (APP_DATA.benchmarkTarifas || []).map(serializeEntry).join(',\n');
   const baseStr    = (APP_DATA.baseHistorica || []).map(serializeEntry).join(',\n');
   const advStr     = (APP_DATA.marketAdvisories || []).map(serializeEntry).join(',\n');
 
   const newBlock =
     '// AUTO DATA START\n' +
-    '  // Tarifas comerciales vigentes (derivadas de Base_Historico: Uso Comercial = Si y Es Ultima = Si)\n' +
-    '  tarifas: [\n' + tarifasStr + '\n  ],\n' +
+    '  // tarifas[] se genera en runtime via buildTarifasRuntime() — no se serializa\n' +
     '  benchmarkTarifas: [\n' + benchStr + '\n  ],\n' +
     '  baseHistorica: [\n' + baseStr + '\n  ],\n' +
     '  marketAdvisories: [\n' + advStr + '\n  ],\n  // AUTO DATA END';
@@ -11396,7 +11389,71 @@ function downloadUpdatedHtml() {
 }
 /* -- FIN ADMIN EXCEL -- */
 
+function buildTarifasRuntime() {
+  const base = APP_DATA.baseHistorica || [];
+  const rutas = (APP_DATA.config || {}).rutasConfig || {};
+
+  // Agrupar por carrier+pod+equipo
+  const routes = {};
+  base.forEach(t => {
+    const key = t.carrier + '|' + t.pod + '|' + t.equipo;
+    if (!routes[key]) routes[key] = [];
+    routes[key].push(t);
+  });
+
+  const result = [];
+  Object.values(routes).forEach(entries => {
+    entries.sort((a, b) => (a.vigDesde || '').localeCompare(b.vigDesde || ''));
+
+    // Entrada operativa: esUltima=Sí y uso=Sí
+    const current = entries.find(e => e.esUltima === 'Sí' && e.uso === 'Sí');
+    if (!current) return;
+
+    // Próxima: entrada más nueva con uso=Sí y vigDesde > current.vigDesde
+    const proxima = entries.filter(e =>
+      e.uso === 'Sí' &&
+      (e.vigDesde || '') > (current.vigDesde || '') &&
+      e.id !== current.id
+    ).sort((a, b) => (a.vigDesde || '').localeCompare(b.vigDesde || ''))[0] || null;
+
+    // Tendencia: comparar con entrada anterior
+    const prevEntries = entries.filter(e =>
+      e.uso === 'Sí' && (e.vigDesde || '') < (current.vigDesde || '')
+    );
+    const prev = prevEntries[prevEntries.length - 1] || null;
+    const tendencia = !prev ? 'stable'
+      : current.compra > prev.compra ? 'up'
+      : current.compra < prev.compra ? 'down'
+      : 'stable';
+
+    // Ruta naviera y transit time desde config
+    const rutaKey = current.carrier + '|' + current.pod;
+    const rutaInfo = rutas[rutaKey] || {};
+
+    result.push({
+      id:           current.id,
+      carrier:      current.carrier,
+      pod:          current.pod,
+      equipo:       current.equipo,
+      compra:       current.compra,
+      vigDesde:     current.vigDesde,
+      vigHasta:     current.vigHasta,
+      tendencia,
+      proxCompra:   proxima ? proxima.compra    : null,
+      proxDesde:    proxima ? proxima.vigDesde  : null,
+      proxHasta:    proxima ? proxima.vigHasta  : null,
+      uso:          current.uso,
+      tipo:         current.tipo,
+      clasificacion: current.clasificacion,
+      rutaNaviera:  rutaInfo.rutaNaviera  || 'Por confirmar',
+      transitTime:  rutaInfo.transitTime  || 'Por confirmar',
+    });
+  });
+
+  APP_DATA.tarifas = result;
+}
 document.addEventListener('DOMContentLoaded', () => {
+  buildTarifasRuntime();
   // Renders
   renderDashKPIs();
   renderSectionFooters();
