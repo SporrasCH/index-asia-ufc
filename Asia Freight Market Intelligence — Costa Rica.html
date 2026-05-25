@@ -3155,7 +3155,7 @@ Kindly Send SI promptly to secure the space.Space are very limits, allocated on 
           </div>
         </div>
 
-        <div class="section-footer">Datos actualizados al 22/05/2026. Fuente: Parisi. Markup: $535 USD fijo.</div>
+        <div class="section-footer">Datos actualizados al 22/05/2026. Fuente: Parisi.</div>
       </section>
 
       <!-- ================================================================
@@ -3877,7 +3877,7 @@ Kindly Send SI promptly to secure the space.Space are very limits, allocated on 
           </div>
         </div>
 
-        <div class="section-footer">Datos actualizados al 22/05/2026. Fuente: Parisi. Markup: $535 USD fijo.</div>
+        <div class="section-footer">Datos actualizados al 22/05/2026. Fuente: Parisi.</div>
       </section>
 
       <!-- ================================================================
@@ -7494,8 +7494,7 @@ destinoConfig: {
 },
     fuente: 'Parisi',
     // AUTO CONFIG START
-    fechaHoy: '2026-05-22',
-    fechaProxVenc: '2026-05-22'
+    fechaHoy: '2026-05-22'
     // AUTO CONFIG END
   },
   marketAdvisories: [
@@ -7957,7 +7956,7 @@ function renderSectionFooters() {
   const fecha = fmt.date(APP_DATA.config.fechaHoy);
   const fuente = APP_DATA.config.fuente;
   const markup = APP_DATA.config.markup;
-  const texto = 'Datos actualizados al ' + fecha + '. Fuente: ' + fuente + '. Markup: $' + markup + ' USD fijo.';
+  const texto = 'Datos actualizados al ' + fecha + '. Fuente: ' + fuente + '.';
 
   document.querySelectorAll('.section-footer').forEach(el => {
     el.textContent = texto;
