@@ -11200,9 +11200,9 @@ function handleAdminExcelFile(event) {
             estado: 'Próxima',
             esUltima: 'No',
             esProxima: 'Sí',
-            tipo: 'FAK',
+            tipo: 'Contract',
             uso: cfg.usoCom,
-            fuente: 'Parisi WCCA',
+            fuente: 'Parisi',
             clasificacion: cfg.clasif,
           });
         });
@@ -11261,7 +11261,7 @@ function confirmAdminExcel() {
         estado: 'Próxima',
         esUltima: 'No',
         esProxima: 'Sí',
-        tipo: 'FAK',
+        tipo: 'Contract',
         uso: 'Sí',
         fuente: 'Manual',
         clasificacion: 'Principal',
@@ -11276,7 +11276,18 @@ function confirmAdminExcel() {
   }
 
   if (!APP_DATA.baseHistorica) APP_DATA.baseHistorica = [];
+  let insertadas = 0;
+  let omitidas = 0;
   allRows.forEach(r => {
+    const duplicado = APP_DATA.baseHistorica.some(existing =>
+      existing.carrier  === r.carrier  &&
+      existing.pod      === r.pod      &&
+      existing.equipo   === r.equipo   &&
+      existing.vigDesde === r.vigDesde &&
+      existing.vigHasta === r.vigHasta
+    );
+    if (duplicado) { omitidas++; return; }
+    insertadas++;
     APP_DATA.baseHistorica.push({
       id: r.id,
       fecha: r.fecha,
@@ -11298,6 +11309,9 @@ function confirmAdminExcel() {
     });
   });
 
+  if (omitidas > 0) {
+    console.info(`Admin Excel: ${omitidas} tarifas omitidas por duplicado, ${insertadas} insertadas.`);
+  }
   if (typeof initHistorico === 'function') initHistorico();
   if (typeof renderDataHub === 'function') renderDataHub();
   if (typeof renderSemaforo === 'function') renderSemaforo();
@@ -11343,7 +11357,10 @@ function confirmAdminExcel() {
   }
 
   closeAdminExcel();
-  if (confirm(`✓ ${allRows.length} tarifas importadas correctamente.${advisoryTexto ? '\n✓ Advisory de mercado actualizado.' : ''}\n\n¿Descargar el HTML actualizado ahora para subir a GitHub?`)) {
+  const msgTarifas = insertadas === allRows.length
+    ? `✓ ${insertadas} tarifas importadas correctamente.`
+    : `✓ ${insertadas} tarifas importadas. ${omitidas} omitidas por duplicado.`;
+  if (confirm(`${msgTarifas}${advisoryTexto ? '\n✓ Advisory de mercado actualizado.' : ''}\n\n¿Descargar el HTML actualizado ahora para subir a GitHub?`)) {
     downloadUpdatedHtml();
   }
 }
