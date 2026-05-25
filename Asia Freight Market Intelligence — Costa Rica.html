@@ -7695,10 +7695,47 @@ function confirmAdminExcel() {
   if (typeof renderSemaforo === 'function') renderSemaforo();
   if (typeof initCharts === 'function') initCharts();
 
-  closeAdminExcel();
-  if (confirm(`✓ ${allRows.length} tarifas importadas correctamente.
+  // Advisory de mercado
+  const advisoryTexto  = document.getElementById('ae-advisory-texto')?.value?.trim() || '';
+  const advisoryDesde  = document.getElementById('ae-advisory-desde')?.value || '';
+  const advisoryHasta  = document.getElementById('ae-advisory-hasta')?.value || '';
+  const advisorySev    = document.getElementById('ae-advisory-severity')?.value || 'info';
 
-¿Descargar el HTML actualizado ahora para subir a GitHub?`)) {
+  if (advisoryTexto) {
+    if (!APP_DATA.marketAdvisories) APP_DATA.marketAdvisories = [];
+    // Desactivar advisories anteriores
+    APP_DATA.marketAdvisories.forEach(a => { a.activa = false; });
+    // Obtener próximo ID
+    const lastId = APP_DATA.marketAdvisories.length
+      ? APP_DATA.marketAdvisories[APP_DATA.marketAdvisories.length - 1].id
+      : 'ADV-000';
+    const nextNum = parseInt(lastId.replace('ADV-', '') || '0') + 1;
+    const newId = 'ADV-' + String(nextNum).padStart(3, '0');
+
+    APP_DATA.marketAdvisories.push({
+      id: newId,
+      fecha: new Date().toISOString().split('T')[0],
+      fuente: 'Parisi',
+      tipo: 'space_alert',
+      severity: advisorySev,
+      vigDesde: advisoryDesde || new Date().toISOString().split('T')[0],
+      vigHasta: advisoryHasta || null,
+      carriers: ['CMA', 'MSC', 'ONE'],
+      puertos: ['Moin', 'Caldera'],
+      equipos: ['20GP', '40HQ'],
+      textoInterno: advisoryTexto,
+      textoCliente: advisoryTexto,
+      surcharges: [],
+      activa: true
+    });
+
+    // Re-renderizar advisory del Dashboard
+    if (typeof renderMarketAdvisoryBanner === 'function') renderMarketAdvisoryBanner();
+    if (typeof renderAdvisoryIntelligence === 'function') renderAdvisoryIntelligence();
+  }
+
+  closeAdminExcel();
+  if (confirm(`✓ ${allRows.length} tarifas importadas correctamente.${advisoryTexto ? '\n✓ Advisory de mercado actualizado.' : ''}\n\n¿Descargar el HTML actualizado ahora para subir a GitHub?`)) {
     downloadUpdatedHtml();
   }
 }
@@ -7719,13 +7756,15 @@ function downloadUpdatedHtml() {
   const tarifasStr = (APP_DATA.tarifas || []).map(serializeEntry).join(',\n');
   const benchStr   = (APP_DATA.benchmarkTarifas || []).map(serializeEntry).join(',\n');
   const baseStr    = (APP_DATA.baseHistorica || []).map(serializeEntry).join(',\n');
+  const advStr     = (APP_DATA.marketAdvisories || []).map(serializeEntry).join(',\n');
 
   const newBlock =
     '// AUTO DATA START\n' +
     '  // Tarifas comerciales vigentes (derivadas de Base_Historico: Uso Comercial = Si y Es Ultima = Si)\n' +
     '  tarifas: [\n' + tarifasStr + '\n  ],\n' +
     '  benchmarkTarifas: [\n' + benchStr + '\n  ],\n' +
-    '  baseHistorica: [\n' + baseStr + '\n  ],\n  // AUTO DATA END';
+    '  baseHistorica: [\n' + baseStr + '\n  ],\n' +
+    '  marketAdvisories: [\n' + advStr + '\n  ],\n  // AUTO DATA END';
 
   const marker_start = '// AUTO DATA START';
   const marker_end   = '// AUTO DATA END';
@@ -7834,6 +7873,37 @@ document.addEventListener('DOMContentLoaded', () => {
             <p style="font-size:13px;font-weight:700;margin:8px 0">Tarifas Moin — ingreso manual</p>
             <div id="ae-moin-inputs" style="display:grid;grid-template-columns:80px 1fr 1fr 120px 120px;gap:8px;font-size:12px"></div>
           </div>
+          <!-- Contexto de mercado -->
+          <div id="ae-market-section" style="margin-top:16px">
+            <p style="font-size:13px;font-weight:700;margin:0 0 8px">
+              Contexto de mercado — Parisi
+            </p>
+            <p style="font-size:12px;color:var(--gray-500);margin:0 0 8px">
+              Pegá el email o notas de Parisi. Se usará para actualizar el advisory del Dashboard.
+            </p>
+            <textarea id="ae-advisory-texto" rows="4"
+              placeholder="Ej: Space remains tight. COSCO updated GRI valid Jun 8-14. Send SI promptly..."
+              style="width:100%;border:1px solid var(--gray-200);border-radius:8px;padding:10px;font-size:12px;resize:vertical;box-sizing:border-box"></textarea>
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:8px">
+              <div>
+                <label style="display:block;font-size:12px;font-weight:600;margin-bottom:4px">Severity</label>
+                <select id="ae-advisory-severity" style="width:100%;border:1px solid var(--gray-200);border-radius:6px;padding:6px 8px;font-size:12px">
+                  <option value="critical">Critical — alerta roja</option>
+                  <option value="warning">Warning — alerta amarilla</option>
+                  <option value="info">Info — sin alerta</option>
+                </select>
+              </div>
+              <div>
+                <label style="display:block;font-size:12px;font-weight:600;margin-bottom:4px">Válido desde</label>
+                <input type="date" id="ae-advisory-desde" style="width:100%;border:1px solid var(--gray-200);border-radius:6px;padding:6px 8px;font-size:12px">
+              </div>
+              <div>
+                <label style="display:block;font-size:12px;font-weight:600;margin-bottom:4px">Válido hasta</label>
+                <input type="date" id="ae-advisory-hasta" style="width:100%;border:1px solid var(--gray-200);border-radius:6px;padding:6px 8px;font-size:12px">
+              </div>
+            </div>
+          </div>
+
           <div class="summary-modal__actions" id="ae-actions" hidden>
             <button type="button" class="summary-action" onclick="closeAdminExcel()">
               <i data-lucide="x"></i> Cancelar
