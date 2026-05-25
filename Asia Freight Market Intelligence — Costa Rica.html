@@ -6194,7 +6194,7 @@ function buildDataHubResumen() {
       );
     });
     if (block.mejor) {
-      lines.push(`  → Mejor cierre del período: ${block.mejor} (${fmt(block.mejorCompra)})`);
+      lines.push(`  → Más económico del período: ${block.mejor} (${fmt(block.mejorCompra)})`);
     }
     lines.push('');
   });
@@ -6251,6 +6251,7 @@ function buildDataHubResumen() {
     output.value = texto;
     modal.hidden = false;
     modal.setAttribute('aria-hidden', 'false');
+    if (typeof setSummaryTab === 'function') setSummaryTab('executive');
     if (window.lucide) lucide.createIcons();
   }
 }
