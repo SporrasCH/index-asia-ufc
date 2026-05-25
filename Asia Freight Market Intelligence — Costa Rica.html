@@ -11390,10 +11390,10 @@ function downloadUpdatedHtml() {
 /* -- FIN ADMIN EXCEL -- */
 
 function buildTarifasRuntime() {
-  const base = APP_DATA.baseHistorica || [];
-  const rutas = (APP_DATA.config || {}).rutasConfig || {};
+  const base    = APP_DATA.baseHistorica || [];
+  const rutas   = (APP_DATA.config || {}).rutasConfig || {};
+  const HOY     = new Date().toISOString().split('T')[0];
 
-  // Agrupar por carrier+pod+equipo
   const routes = {};
   base.forEach(t => {
     const key = t.carrier + '|' + t.pod + '|' + t.equipo;
@@ -11405,18 +11405,29 @@ function buildTarifasRuntime() {
   Object.values(routes).forEach(entries => {
     entries.sort((a, b) => (a.vigDesde || '').localeCompare(b.vigDesde || ''));
 
-    // Entrada operativa: esUltima=Sí y uso=Sí
-    const current = entries.find(e => e.esUltima === 'Sí' && e.uso === 'Sí');
+    // La entrada marcada como esUltima=Sí (uso=Sí)
+    const esUltima = entries.find(e => e.esUltima === 'Sí' && e.uso === 'Sí');
+    if (!esUltima) return;
+
+    let current, proxima;
+    const esUltimaActiva = (esUltima.vigDesde || '') <= HOY;
+
+    if (esUltimaActiva) {
+      // Caso normal: esUltima ya está vigente hoy
+      current = esUltima;
+      proxima = null;
+    } else {
+      // esUltima es futura — buscar la tarifa vigente hoy como current
+      const anteriores = entries.filter(e =>
+        e.uso === 'Sí' && (e.vigDesde || '') < (esUltima.vigDesde || '')
+      );
+      current = anteriores[anteriores.length - 1] || null;
+      proxima = esUltima;
+    }
+
     if (!current) return;
 
-    // Próxima: entrada más nueva con uso=Sí y vigDesde > current.vigDesde
-    const proxima = entries.filter(e =>
-      e.uso === 'Sí' &&
-      (e.vigDesde || '') > (current.vigDesde || '') &&
-      e.id !== current.id
-    ).sort((a, b) => (a.vigDesde || '').localeCompare(b.vigDesde || ''))[0] || null;
-
-    // Tendencia: comparar con entrada anterior
+    // Tendencia: comparar current con la entrada anterior a current
     const prevEntries = entries.filter(e =>
       e.uso === 'Sí' && (e.vigDesde || '') < (current.vigDesde || '')
     );
@@ -11426,8 +11437,7 @@ function buildTarifasRuntime() {
       : current.compra < prev.compra ? 'down'
       : 'stable';
 
-    // Ruta naviera y transit time desde config
-    const rutaKey = current.carrier + '|' + current.pod;
+    const rutaKey  = current.carrier + '|' + current.pod;
     const rutaInfo = rutas[rutaKey] || {};
 
     result.push({
